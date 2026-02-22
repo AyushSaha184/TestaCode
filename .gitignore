@@ -53,3 +53,7 @@ htmlcov/
 database/
 generated_tests/
 testgen.db
+
+# Project Planning Files
+detailed_implementation_plan.md
+summary.md
