@@ -48,3 +48,8 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# AI-Test-Gen Data
+database/
+generated_tests/
+testgen.db

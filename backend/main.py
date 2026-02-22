@@ -1,193 +1,124 @@
-"""
-FastAPI Backend for AI-Powered Test Case Generator.
-Designed for integration with Streamlit frontend and external agents.
-"""
-import os
-import subprocess
-from pathlib import Path
-from typing import Optional
+from fastapi import FastAPI, Request, status, UploadFile, File, Form
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import time
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from backend.core.config import logger
+from backend.core.database import Base, engine
+from backend.schemas import GenerationRequest, GenerationResponse, ErrorResponse, TargetLanguage, InputMode
+import backend.models  # Requires this import to register Models to SQLAlchemy
+
+# Import input processors
+from backend.input.handlers import process_natural_language, process_pasted_code, process_file_upload
+
+# Automatically create initialization if SQLite
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables verified/created.")
+except Exception as e:
+    logger.critical(f"Database initialization failed: {e}")
 
 app = FastAPI(
     title="AI Test Generator API",
-    description="Generate tests from feature descriptions, save to project, run pytest. Agent-friendly.",
-    version="0.1.0",
+    description="Backend for AI-Powered Test Case Generator",
+    version="1.0.0"
 )
 
-# Default paths - configurable via env
-PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT", Path(__file__).parent.parent))
-TESTS_DIR = PROJECT_ROOT / "generated_tests"
-TESTS_DIR.mkdir(parents=True, exist_ok=True)
+# CORS configuration for Streamlit connections
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, restrict to frontend deployment URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# Global Exception Handler (Edge Case: Prevent raw stack traces)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An internal server error occurred. Please try again later."},
+    )
 
-# --- Request/Response Models ---
-
-class GenerateTestsRequest(BaseModel):
-    feature_description: str = Field(..., description="Description of the feature to test")
-    test_file_name: Optional[str] = Field(None, description="Output filename (default: test_generated.py)")
-    language: str = Field("python", description="Target language/framework (python, pytest)")
-
-
-class GenerateTestsResponse(BaseModel):
-    success: bool
-    test_content: str
-    file_path: str
-    message: str
-
-
-class SaveTestsRequest(BaseModel):
-    test_content: str = Field(..., description="Python test code to save")
-    file_path: Optional[str] = Field(None, description="Relative path under generated_tests/")
-
-
-class SaveTestsResponse(BaseModel):
-    success: bool
-    file_path: str
-    message: str
-
-
-class RunTestsRequest(BaseModel):
-    test_path: Optional[str] = Field(None, description="Path to test file or directory (relative to project)")
-    pytest_args: Optional[list[str]] = Field(default_factory=lambda: ["-v"], description="Extra pytest arguments")
-
-
-class RunTestsResponse(BaseModel):
-    success: bool
-    passed: bool
-    output: str
-    exit_code: int
-    summary: dict
-
-
-# --- Services ---
-
-def _call_llm_for_tests(description: str) -> str:
-    """Generate test code using LLM. Replace with agent call when integrating."""
-    import os
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a test engineer. Generate pytest test cases in Python. Return ONLY valid Python code, no markdown fences or explanations."
-                },
-                {
-                    "role": "user",
-                    "content": f"Generate pytest tests for this feature:\n\n{description}"
-                }
-            ],
-            temperature=0.3,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        # Fallback: return a template when no API key or error
-        return f'''"""
-Auto-generated test template for: {description[:80]}...
-Replace with actual test logic or configure OPENAI_API_KEY.
-"""
-import pytest
-
-
-def test_feature_placeholder():
-    """Placeholder - configure OPENAI_API_KEY for AI generation."""
-    assert True
-'''
-
-
-@app.post("/api/generate-tests", response_model=GenerateTestsResponse)
-async def generate_tests(req: GenerateTestsRequest):
-    """Generate test cases from a feature description. Agent-callable."""
-    try:
-        content = _call_llm_for_tests(req.feature_description)
-        filename = req.test_file_name or "test_generated.py"
-        if not filename.endswith(".py"):
-            filename += ".py"
-        file_path = str(TESTS_DIR / filename)
-        return GenerateTestsResponse(
-            success=True,
-            test_content=content,
-            file_path=file_path,
-            message="Tests generated successfully",
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/save-tests", response_model=SaveTestsResponse)
-async def save_tests(req: SaveTestsRequest):
-    """Save test content to project. Agent-callable."""
-    try:
-        rel_path = req.file_path or "test_generated.py"
-        if not rel_path.endswith(".py"):
-            rel_path += ".py"
-        full_path = TESTS_DIR / rel_path
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        full_path.write_text(req.test_content, encoding="utf-8")
-        return SaveTestsResponse(
-            success=True,
-            file_path=str(full_path),
-            message=f"Saved to {full_path}",
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/run-tests", response_model=RunTestsResponse)
-async def run_tests(req: RunTestsRequest):
-    """Run pytest and return pass/fail. Agent-callable."""
-    try:
-        target = req.test_path or str(TESTS_DIR)
-        if not os.path.isabs(target):
-            target = str(PROJECT_ROOT / target)
-        if not os.path.exists(target):
-            raise HTTPException(status_code=404, detail=f"Path not found: {target}")
-        args = ["pytest", target, *(req.pytest_args or ["-v"])]
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-            timeout=120,
-        )
-        output = result.stdout + result.stderr
-        passed = result.returncode == 0
-        return RunTestsResponse(
-            success=True,
-            passed=passed,
-            output=output,
-            exit_code=result.returncode,
-            summary={
-                "passed": passed,
-                "exit_code": result.returncode,
-            },
-        )
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="pytest timed out")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+# Middleware for timing and tracking usage
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    
+    process_time = (time.time() - start_time) * 1000  # Convert to ms
+    logger.info(f"Completed request: {request.method} {request.url.path} - Status: {response.status_code} - Time: {process_time:.2f}ms")
+    
+    return response
 
 @app.get("/api/health")
-async def health():
-    """Health check for agents and load balancers."""
-    return {"status": "ok", "service": "ai-test-generator"}
+def health_check():
+    return {"status": "ok"}
 
+@app.post("/api/generate/text", response_model=GenerationResponse, responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
+def generate_tests_from_text(request: GenerationRequest):
+    """Processes Natural Language OR Pasted Code."""
+    logger.info(f"Text-based generation started | Mode: {request.input_mode.value} | Language: {request.language.value}")
+    
+    if request.input_mode == InputMode.natural_language:
+        unified_input = process_natural_language(request.content, request.language)
+    elif request.input_mode == InputMode.pasted_code:
+        unified_input = process_pasted_code(request.content, request.language)
+    else:
+        return JSONResponse(status_code=400, content={"detail": "Invalid input mode for this endpoint."})
+        
+    # Pass the Unified Object into Phase 3 LangChain Orchestrator
+    try:
+        from backend.agents.orchestrator import process_generation_flow
+        agent_result = process_generation_flow(unified_input, request.options)
+        
+        # Determine if clarification stopped the flow
+        if agent_result["status"] == "clarification_needed":
+            return GenerationResponse(
+                job_id=999,
+                generated_test_code="",
+                warnings=[f"Clarification specific to your prompt: \n{agent_result['message']}"]
+            )
+            
+        return GenerationResponse(
+            job_id=999,
+            generated_test_code=agent_result["code"],
+            quality_score=0.0, # Phase 4 evaluation pending
+            warnings=unified_input.warnings + ([] if agent_result["status"] == "success" else [agent_result["message"]])
+        )
+    except Exception as e:
+        logger.error(f"Agent Orchestrator failed: {e}")
+        return JSONResponse(status_code=500, content={"detail": f"Agent generation crashed: {str(e)}"})
 
-@app.get("/api/config")
-async def get_config():
-    """Expose config for agent discovery."""
-    return {
-        "project_root": str(PROJECT_ROOT),
-        "tests_dir": str(TESTS_DIR),
-        "endpoints": ["/api/generate-tests", "/api/save-tests", "/api/run-tests", "/api/health"],
-    }
-
+@app.post("/api/generate/file", response_model=GenerationResponse, responses={400: {"model": ErrorResponse}, 413: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
+async def generate_tests_from_file(file: UploadFile = File(...)):
+    """Processes uploaded source code files."""
+    logger.info(f"File-based generation started | File: {file.filename}")
+    
+    unified_input = await process_file_upload(file)
+    # Pass the Unified Object into Phase 3 LangChain Orchestrator
+    try:
+        from backend.agents.orchestrator import process_generation_flow
+        from backend.schemas import GenerationOptions
+        
+        # File uploads use default options for now since FormData lacks nested params easily
+        options = GenerationOptions() 
+        agent_result = process_generation_flow(unified_input, options)
+        
+        return GenerationResponse(
+            job_id=999,
+            generated_test_code=agent_result["code"],
+            quality_score=0.0, # Phase 4 evaluation pending
+            warnings=unified_input.warnings + ([] if agent_result["status"] == "success" else [agent_result["message"]])
+        )
+    except Exception as e:
+        logger.error(f"Agent Orchestrator failed on file processing: {e}")
+        return JSONResponse(status_code=500, content={"detail": f"Agent generation crashed: {str(e)}"})
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
