@@ -28,7 +28,7 @@ def sanitize_and_fix_code(agent_output: str, language: str, retries_left: int = 
     iterations.append({"attempt": 3 - retries_left, "error": error_msg, "fixed": False})
 
     from backend.agents.chains import get_llm
-    from langchain.prompts import PromptTemplate
+    from langchain_core.prompts import PromptTemplate
 
     fix_prompt = PromptTemplate(
         template="""You are an expert developer. The following code failed syntax validation:

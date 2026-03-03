@@ -2,7 +2,9 @@ import os
 from fastapi import HTTPException
 from backend.input.models import UnifiedContext, ClassifiedIntent
 from backend.schemas import InputMode, TargetLanguage
-from backend.core.config import logger
+from src.utils.logger import get_logger
+
+logger = get_logger("ai_test_gen.handlers")
 
 
 # ─── File Size Limit ──────────────────────────────────────────────────────────
@@ -66,19 +68,16 @@ def process_code_input(
                 detail=f"Python Syntax Error at line {e.lineno}: {e.msg}. Please fix the code and try again.",
             )
     elif language in (TargetLanguage.javascript, TargetLanguage.typescript):
-        # JS/TS parsing will be handled by LLM-based parser in Phase 2
-        warnings.append("AST extraction for JS/TS uses LLM-based parsing (Phase 2).")
+        from backend.input.js_parser import parse_js_ts_code
+        parsed_data = parse_js_ts_code(code_content)
+        extracted_functions = parsed_data.get("functions", [])
+        warnings.extend(parsed_data.get("warnings", []))
     elif language == TargetLanguage.java:
         warnings.append("Java code parsing is not yet supported. The LLM will use raw code context.")
 
     # ─── Prompt Intent Classification ─────────────────────────────────────────
-    # Placeholder — full implementation in Phase 2 (intent_classifier.py)
-    classified_intent = ClassifiedIntent(
-        test_type="unit",
-        target_scope="all",
-        target_framework="auto",
-        confidence=0.5,
-    )
+    from backend.input.intent_classifier import classify_intent
+    classified_intent = classify_intent(user_prompt)
 
     logger.info(
         f"Input processed | mode={input_mode.value} | lang={language.value} "

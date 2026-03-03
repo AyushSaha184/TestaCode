@@ -1,6 +1,6 @@
 import os
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from backend.agents.prompts import (
     NL_ANALYSIS_PROMPT,
     CODE_ANALYSIS_PROMPT,

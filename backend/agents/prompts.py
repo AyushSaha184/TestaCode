@@ -1,4 +1,4 @@
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 # 1. Natural Language Requirement Analysis Prompt
 # Goal: Infer implementation details from a potentially vague description.
