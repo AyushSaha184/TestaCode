@@ -1,127 +1,140 @@
+import os
 from fastapi import HTTPException
-from backend.input.models import UnifiedInput
+from backend.input.models import UnifiedContext, ClassifiedIntent
 from backend.schemas import InputMode, TargetLanguage
-import re
+from backend.core.config import logger
 
-def process_natural_language(text_input: str, target_lang: TargetLanguage) -> UnifiedInput:
-    """
-    Validates and standardizes natural language feature requests.
-    Flags overly vague or short descriptions.
-    """
-    cleaned_text = text_input.strip()
-    
-    # Word count heuristic
-    words = cleaned_text.split()
-    if len(words) < 5:
-        raise HTTPException(
-            status_code=400, 
-            detail="The description is too short. Please provide at least a full sentence describing the expected behavior."
-        )
 
-    warnings = []
-    
-    # Simple vagueness check (no actionable nouns/verbs typical to testing)
-    test_keywords = r'(function|class|method|api|endpoint|return|fail|exception|error|parameter|input|output|should|must|validate)'
-    if not re.search(test_keywords, cleaned_text, re.IGNORECASE):
-        warnings.append("Vague description detected. The AI may require clarification to generate accurate edge cases.")
-        
-    return UnifiedInput(
-        raw_content=cleaned_text,
-        mode=InputMode.natural_language,
-        language=target_lang,
-        extracted_functions=[],
-        warnings=warnings
-    )
+# ─── File Size Limit ──────────────────────────────────────────────────────────
+MAX_FILE_SIZE_BYTES = 50 * 1024  # 50KB
 
-def process_pasted_code(code_str: str, target_lang: TargetLanguage) -> UnifiedInput:
+# ─── Extension → Language Mapping ─────────────────────────────────────────────
+EXTENSION_LANGUAGE_MAP = {
+    ".py": TargetLanguage.python,
+    ".js": TargetLanguage.javascript,
+    ".jsx": TargetLanguage.javascript,
+    ".ts": TargetLanguage.typescript,
+    ".tsx": TargetLanguage.typescript,
+    ".java": TargetLanguage.java,
+}
+
+
+def process_code_input(
+    code_content: str,
+    language: TargetLanguage,
+    user_prompt: str,
+    filename: str | None = None,
+) -> UnifiedContext:
     """
-    Validates pasted code and runs it through the AST parser if Python.
+    Unified entry point for all code input (paste or upload).
+    Validates code, runs parser, runs intent classifier, and assembles
+    the UnifiedContext object that the agent layer consumes.
     """
-    if not code_str.strip():
-        raise HTTPException(status_code=400, detail="Pasted code cannot be empty.")
-        
+    if not code_content.strip():
+        raise HTTPException(status_code=400, detail="Code content cannot be empty.")
+
+    # Enforce file size limit
+    if len(code_content.encode("utf-8")) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Code content too large. Maximum size is 50KB.")
+
+    # Determine input mode
+    input_mode = InputMode.upload if filename else InputMode.paste
+
+    # If filename provided, validate extension and reconcile language
+    if filename:
+        _, ext = os.path.splitext(filename)
+        ext = ext.lower()
+        if ext not in EXTENSION_LANGUAGE_MAP:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{ext}'. Supported: {', '.join(EXTENSION_LANGUAGE_MAP.keys())}",
+            )
+
     warnings = []
     extracted_functions = []
-    
-    if target_lang == TargetLanguage.python:
+
+    # ─── Code Parsing ─────────────────────────────────────────────────────────
+    if language == TargetLanguage.python:
         from backend.input.parsers import parse_python_code
         try:
-            parsed_data = parse_python_code(code_str)
+            parsed_data = parse_python_code(code_content)
             extracted_functions = parsed_data.get("functions", [])
             warnings.extend(parsed_data.get("warnings", []))
         except SyntaxError as e:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Python Syntax Error in pasted code at line {e.lineno}: {e.msg}. Please fix the code and try again."
+                status_code=400,
+                detail=f"Python Syntax Error at line {e.lineno}: {e.msg}. Please fix the code and try again.",
             )
-    else:
-        # JavaScript/TypeScript placeholder (Would use external JS parser eventually)
-        warnings.append("AST extraction for JavaScript is not yet fully supported. The LLM will use raw code context only.")
+    elif language in (TargetLanguage.javascript, TargetLanguage.typescript):
+        # JS/TS parsing will be handled by LLM-based parser in Phase 2
+        warnings.append("AST extraction for JS/TS uses LLM-based parsing (Phase 2).")
+    elif language == TargetLanguage.java:
+        warnings.append("Java code parsing is not yet supported. The LLM will use raw code context.")
 
-    return UnifiedInput(
-        raw_content=code_str,
-        mode=InputMode.pasted_code,
-        language=target_lang,
-        extracted_functions=extracted_functions,
-        warnings=warnings
+    # ─── Prompt Intent Classification ─────────────────────────────────────────
+    # Placeholder — full implementation in Phase 2 (intent_classifier.py)
+    classified_intent = ClassifiedIntent(
+        test_type="unit",
+        target_scope="all",
+        target_framework="auto",
+        confidence=0.5,
     )
 
-import os
-from fastapi import UploadFile
+    logger.info(
+        f"Input processed | mode={input_mode.value} | lang={language.value} "
+        f"| functions={len(extracted_functions)} | warnings={len(warnings)}"
+    )
 
-MAX_FILE_SIZE_BYTES = 50 * 1024 # 50KB
+    return UnifiedContext(
+        raw_code=code_content,
+        language=language,
+        input_mode=input_mode,
+        filename=filename,
+        extracted_functions=extracted_functions,
+        classified_intent=classified_intent,
+        user_prompt=user_prompt,
+        warnings=warnings,
+    )
 
-async def process_file_upload(file: UploadFile) -> UnifiedInput:
+
+# ─── File Upload Handler (used by Streamlit frontend) ─────────────────────────
+
+async def process_file_upload_bytes(
+    file_bytes: bytes,
+    filename: str,
+    user_prompt: str,
+) -> UnifiedContext:
     """
-    Reads an uploaded file stream, validates its extension/size, 
-    detects language, and passes it through AST if Python.
+    Handles file uploads from the Streamlit frontend.
+    Reads bytes, validates extension/size, detects language, then delegates
+    to process_code_input for uniform downstream processing.
     """
-    # Extension validation
-    _, ext = os.path.splitext(file.filename or "")
-    ext = ext.lower()
-    
-    if ext == ".py":
-        language = TargetLanguage.python
-    elif ext in [".js", ".ts"]:
-        language = TargetLanguage.javascript
-    else:
-        from backend.core.config import logger
-        logger.warning(f"Rejected file with invalid extension: {ext}")
-        raise HTTPException(status_code=400, detail=f"Unsupported file type '{ext}'. Please upload .py, .js, or .ts files.")
-
-    # Size Verification & Decoding
-    content_bytes = await file.read()
-    
-    if len(content_bytes) > MAX_FILE_SIZE_BYTES:
-        from backend.core.config import logger
-        logger.warning(f"Rejected file over size limit: {len(content_bytes)} bytes")
+    # Size check
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 50KB.")
 
+    # Decode
     try:
-        content_str = content_bytes.decode("utf-8")
+        content_str = file_bytes.decode("utf-8")
     except UnicodeDecodeError:
-        from backend.core.config import logger
-        logger.warning("Rejected file - failed UTF-8 decode (possible binary).")
-        raise HTTPException(status_code=400, detail="Ensure the file is standard text and not a compiled binary or image.")
+        raise HTTPException(
+            status_code=400,
+            detail="Ensure the file is standard text and not a compiled binary or image.",
+        )
 
-    warnings = []
-    extracted_functions = []
+    # Detect language from extension
+    _, ext = os.path.splitext(filename)
+    ext = ext.lower()
+    if ext not in EXTENSION_LANGUAGE_MAP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Supported: {', '.join(EXTENSION_LANGUAGE_MAP.keys())}",
+        )
+    language = EXTENSION_LANGUAGE_MAP[ext]
 
-    # Parse if Python
-    if language == TargetLanguage.python:
-        try:
-            from backend.input.parsers import parse_python_code
-            parsed_data = parse_python_code(content_str)
-            extracted_functions = parsed_data.get("functions", [])
-            warnings.extend(parsed_data.get("warnings", []))
-        except SyntaxError as e:
-            raise HTTPException(status_code=400, detail=f"Python Syntax Error in uploaded file at line {e.lineno}: {e.msg}")
-
-    # Build standard object
-    return UnifiedInput(
-        raw_content=content_str,
-        mode=InputMode.file_upload,
+    return process_code_input(
+        code_content=content_str,
         language=language,
-        extracted_functions=extracted_functions,
-        warnings=warnings
+        user_prompt=user_prompt,
+        filename=filename,
     )
