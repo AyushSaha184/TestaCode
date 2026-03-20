@@ -83,6 +83,9 @@ htmlcov/
 generated_tests/
 testgen.db
 
+# Local deployment / machine-specific files
+.env
+
 # Project Planning Files
 detailed_implementation_plan.md
 summary.md
