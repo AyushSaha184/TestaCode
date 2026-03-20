@@ -2,7 +2,7 @@ FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
 
-ARG VITE_API_BASE_URL=http://localhost:8000
+ARG VITE_API_BASE_URL=https://testa-code.vercel.app
 ARG VITE_API_TIMEOUT_MS=30000
 
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
@@ -23,7 +23,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl nginx \
+    && apt-get install -y --no-install-recommends build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
@@ -35,11 +35,9 @@ COPY database ./database
 COPY generated_tests ./generated_tests
 COPY src ./src
 COPY .env.example ./.env.example
-COPY frontend/nginx.conf /etc/nginx/sites-available/default
-COPY --from=frontend-build /frontend/dist /usr/share/nginx/html
 
 RUN mkdir -p /app/logs
 
-EXPOSE 8000 80
+EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port 8000 & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
