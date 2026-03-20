@@ -14,7 +14,6 @@ from backend.input.intent_classifier import PromptIntentClassifier
 from backend.input.js_parser import JavaScriptTypeScriptParser
 from backend.input.parsers import ParserService
 from backend.repositories.generation_repository import GenerationRepository
-from backend.services.ci_integration_service import GitHubCIIntegrationService
 from backend.services.file_output_service import FileOutputService
 from backend.services.git_integration_service import GitIntegrationService
 from backend.services.supabase_storage_service import SupabaseStorageService
@@ -107,25 +106,12 @@ def get_orchestrator() -> GenerationOrchestrator:
         enable_git_push=settings.enable_git_push,
     )
 
-    ci_integration_service = None
-    if settings.ci_integration_enabled:
-        ci_integration_service = GitHubCIIntegrationService(
-            token=settings.github_token,
-            owner=settings.github_owner,
-            repo=settings.github_repo,
-            workflow_name=settings.github_workflow_name,
-            poll_interval_seconds=settings.ci_poll_interval_seconds,
-            repository=repository,
-        )
-
     return GenerationOrchestrator(
         repository=repository,
         input_service=input_service,
         chain=chain,
         file_output_service=file_output_service,
         git_integration_service=git_integration_service,
-        ci_integration_service=ci_integration_service,
-        workflow_name=settings.github_workflow_name,
         idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
         idempotency_cache=idempotency_cache,
     )

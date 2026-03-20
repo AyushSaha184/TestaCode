@@ -96,16 +96,6 @@ def rerun_job(
     return orchestrator.rerun(job_id, session_id=session_id)
 
 
-@router.post("/jobs/{job_id}/ci/poll", response_model=JobStatusView)
-def poll_ci(
-    job_id: UUID,
-    session_id: Annotated[str, Header(alias="X-Session-Id")],
-    orchestrator: GenerationOrchestrator = Depends(get_orchestrator),
-) -> JobStatusView:
-    logger.info("ci_poll_requested", extra={"step": "ci", "job_id": str(job_id), "status": "processing"})
-    return orchestrator.poll_ci(job_id, session_id=session_id)
-
-
 @router.get("/jobs/{job_id}/status", response_model=JobStatusView)
 def get_job_status(
     job_id: UUID,

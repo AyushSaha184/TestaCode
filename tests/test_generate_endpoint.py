@@ -41,20 +41,17 @@ class FakeOrchestrator:
             commit_sha="abc123",
         )
 
-    def poll_ci(self, job_id, session_id):
+    def get_status(self, job_id, session_id):
         assert session_id
         return JobStatusView(
             job_id=job_id,
             status=JobStatus.completed,
-            ci_status="ci_passed",
-            ci_conclusion="success",
-            ci_run_url="http://ci/run/1",
-            ci_run_id="1",
+            ci_status="file_written",
+            ci_conclusion=None,
+            ci_run_url=None,
+            ci_run_id=None,
             ci_updated_at=None,
         )
-
-    def get_status(self, job_id, session_id):
-        return self.poll_ci(job_id, session_id)
 
 
 def test_generate_endpoint_form_contract() -> None:
@@ -92,10 +89,6 @@ def test_status_endpoints_contract() -> None:
 
     status_response = client.get(f"/jobs/{job_id}/status", headers={"X-Session-Id": "session-test-1"})
     assert status_response.status_code == 200
-    assert status_response.json()["ci_status"] == "ci_passed"
-
-    poll_response = client.post(f"/jobs/{job_id}/ci/poll", headers={"X-Session-Id": "session-test-1"})
-    assert poll_response.status_code == 200
-    assert poll_response.json()["ci_conclusion"] == "success"
+    assert status_response.json()["ci_status"] == "file_written"
 
     app.dependency_overrides.clear()

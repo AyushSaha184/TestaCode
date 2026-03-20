@@ -27,7 +27,7 @@ AI Test Generation platform with FastAPI backend and React dashboard frontend.
 - VITE_API_BASE_URL (required)
 - VITE_API_TIMEOUT_MS (optional)
 
-## Backend Env Vars (Supabase + Deploy)
+## Backend Env Vars
 - SUPABASE_DB_URL (required)
 - SUPABASE_URL (required for Storage)
 - SUPABASE_SERVICE_ROLE_KEY (required for private bucket uploads/signed URLs; backend only)
@@ -38,23 +38,6 @@ AI Test Generation platform with FastAPI backend and React dashboard frontend.
 - RENDER_EXTERNAL_URL (Render public backend URL)
 - VERCEL_FRONTEND_URL (Vercel frontend URL for CORS)
 - LOG_TO_FILE (default: true, set false on Render to use stdout-only logs)
-
-## Deployment
-### Render (Backend)
-1. Use start command:
-   - uvicorn backend.app:app --host 0.0.0.0 --port $PORT
-2. Set health check path:
-   - /health
-3. Set required backend env vars from `.env.example`.
-4. Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only.
-
-`render.yaml` is included with these defaults.
-
-### Vercel (Frontend)
-1. Set env var:
-   - VITE_API_BASE_URL=https://<your-render-service>.onrender.com
-2. Do not set backend-only secrets in Vercel.
-3. `frontend/vercel.json` includes SPA rewrite to `index.html`.
 
 ## Supabase Storage Behavior
 - Bucket default: `code-files`
@@ -77,5 +60,4 @@ AI Test Generation platform with FastAPI backend and React dashboard frontend.
 - GET /jobs
 - GET /jobs/{job_id}
 - POST /jobs/{job_id}/rerun
-- POST /jobs/{job_id}/ci/poll
 - GET /jobs/{job_id}/status

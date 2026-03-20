@@ -9,7 +9,6 @@ from backend.core.exceptions import AppError
 from backend.core.logger import get_logger
 from backend.input.handlers import InputProcessingService
 from backend.repositories.generation_repository import GenerationRepository
-from backend.services.ci_integration_service import CIState, GitHubCIIntegrationService
 from backend.services.file_output_service import FileOutputResult, FileOutputService
 from backend.services.git_integration_service import GitIntegrationService
 from backend.schemas import (
@@ -31,8 +30,6 @@ class GenerationOrchestrator:
 		chain: TestGenerationChain,
 		file_output_service: FileOutputService,
 		git_integration_service: GitIntegrationService,
-		ci_integration_service: GitHubCIIntegrationService | None,
-		workflow_name: str,
 		idempotency_ttl_seconds: int,
 		idempotency_cache: CacheBackend[str, UUID] | None = None,
 	) -> None:
@@ -41,8 +38,6 @@ class GenerationOrchestrator:
 		self.chain = chain
 		self.file_output_service = file_output_service
 		self.git_integration_service = git_integration_service
-		self.ci_integration_service = ci_integration_service
-		self.workflow_name = workflow_name
 		self.idempotency_cache = idempotency_cache or TTLCache[str, UUID](idempotency_ttl_seconds)
 
 	def generate(self, request: GenerationRequest, initial_warnings: list[str], idempotency_key: str | None) -> GenerationResponse:
@@ -193,11 +188,10 @@ class GenerationOrchestrator:
 						job_id,
 						commit_sha=git_result.commit_sha,
 						ci_status="committed",
-						workflow_name=self.workflow_name,
 					)
 					if git_result.push_attempted and git_result.push_succeeded:
-						ci_status = "ci_pending"
-						self.repository.update_ci_state(job_id, ci_status="ci_pending", workflow_name=self.workflow_name)
+						ci_status = "committed"
+						self.repository.update_ci_state(job_id, ci_status="committed")
 					elif git_result.push_attempted and not git_result.push_succeeded:
 						ci_status = "ci_unavailable"
 						ci_conclusion = "push_failed"
@@ -286,39 +280,6 @@ class GenerationOrchestrator:
 			quality_score=response.quality_score,
 			ci_status=response.ci_status,
 			commit_sha=response.commit_sha,
-		)
-
-	def poll_ci(self, job_id: UUID, session_id: str) -> JobStatusView:
-		if self.ci_integration_service is None:
-			self.repository.update_ci_state(job_id, ci_status="ci_unavailable", ci_conclusion="ci_disabled")
-		else:
-			try:
-				state: CIState = self.ci_integration_service.poll_by_job_id(job_id, session_id=session_id)
-				if state.ci_status:
-					self.repository.update_ci_state(
-						job_id,
-						ci_status=state.ci_status,
-						ci_conclusion=state.ci_conclusion,
-						ci_run_url=state.ci_run_url,
-						ci_run_id=state.ci_run_id,
-						workflow_name=self.workflow_name,
-					)
-			except Exception as exc:
-				warning = f"CI polling failed: {exc}"
-				self.repository.append_warning(job_id, warning)
-				self.repository.update_ci_state(job_id, ci_status="ci_unavailable", ci_conclusion="poll_failed")
-
-		job = self.repository.get_job(job_id, session_id=session_id)
-		if not job:
-			raise AppError("Job not found", status_code=404)
-		return JobStatusView(
-			job_id=job.id,
-			status=job.status,
-			ci_status=job.ci_status,
-			ci_conclusion=job.ci_conclusion,
-			ci_run_url=job.ci_run_url,
-			ci_run_id=job.ci_run_id,
-			ci_updated_at=job.ci_updated_at,
 		)
 
 	def get_status(self, job_id: UUID, session_id: str) -> JobStatusView:

@@ -13,7 +13,6 @@ from backend.core.middleware import RequestContextMiddleware
 
 def create_app() -> FastAPI:
 	settings = get_settings()
-	settings.validate_ci_configuration()
 	settings.validate_production_configuration()
 	configure_logging()
 	app = FastAPI(title=settings.app_name)

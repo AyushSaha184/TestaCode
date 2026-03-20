@@ -61,13 +61,6 @@ class Settings(BaseModel):
 	llm_timeout_seconds: int = Field(default=int(os.getenv("LLM_TIMEOUT_SECONDS", "25")))
 	llm_max_retries: int = Field(default=int(os.getenv("LLM_MAX_RETRIES", "3")))
 
-	github_token: str = Field(default=os.getenv("GITHUB_TOKEN", ""))
-	github_owner: str = Field(default=os.getenv("GITHUB_OWNER", ""))
-	github_repo: str = Field(default=os.getenv("GITHUB_REPO", ""))
-	github_workflow_name: str = Field(default=os.getenv("GITHUB_WORKFLOW_NAME", "generated-tests-ci"))
-	ci_poll_interval_seconds: int = Field(default=int(os.getenv("CI_POLL_INTERVAL_SECONDS", "10")))
-	ci_integration_enabled: bool = Field(default=os.getenv("CI_INTEGRATION_ENABLED", "false").lower() == "true")
-
 	auto_commit_default: bool = Field(default=os.getenv("AUTO_COMMIT_DEFAULT", "false").lower() == "true")
 	git_author_name: str = Field(default=os.getenv("GIT_AUTHOR_NAME", "ai-test-gen-bot"))
 	git_author_email: str = Field(default=os.getenv("GIT_AUTHOR_EMAIL", "ai-test-gen-bot@example.com"))
@@ -80,19 +73,6 @@ class Settings(BaseModel):
 
 	def resolved_generated_tests_dir(self) -> str:
 		return str((Path(self.resolved_repository_root()) / self.generated_tests_dir).resolve())
-
-	def validate_ci_configuration(self) -> None:
-		if not self.ci_integration_enabled:
-			return
-		missing: list[str] = []
-		if not self.github_token:
-			missing.append("GITHUB_TOKEN")
-		if not self.github_owner:
-			missing.append("GITHUB_OWNER")
-		if not self.github_repo:
-			missing.append("GITHUB_REPO")
-		if missing:
-			raise ValueError(f"CI integration enabled but missing env vars: {', '.join(missing)}")
 
 	def validate_production_configuration(self) -> None:
 		if self.app_env.lower() != "production":

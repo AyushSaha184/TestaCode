@@ -34,7 +34,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         <p className="mt-2 text-xs leading-relaxed text-slate-300">
           TestaCode is an AI-assisted test engineering workspace for generating, evaluating, and iterating tests from
           real source code. It combines prompt guidance, code parsing, model-driven generation, quality scoring, and
-          CI-aware feedback in one flow.
+          artifact tracking in one flow.
         </p>
 
         <div className="mt-4 space-y-3">
@@ -45,7 +45,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               <li>2. Language is auto-detected and normalized before generation.</li>
               <li>3. Tests are generated with framework-aware structure and edge-case coverage.</li>
               <li>4. Output includes job ID, quality score, uncovered areas, and warning signals.</li>
-              <li>5. Jobs can be reviewed, rerun, and traced against CI status.</li>
+              <li>5. Jobs can be reviewed, rerun, and traced through saved outputs and status updates.</li>
             </ul>
           </div>
 
@@ -56,7 +56,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               <li>Unified handling for prompt-only, pasted code, and file-upload inputs.</li>
               <li>Quality diagnostics: score, blind spots, and generation warnings.</li>
               <li>Optional auto-commit workflow for generated tests.</li>
-              <li>CI workflow polling for visibility into test pipeline outcomes.</li>
+              <li>Saved artifacts and job history for follow-up review.</li>
             </ul>
           </div>
 

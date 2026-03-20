@@ -8,7 +8,7 @@ import { JsonCollapse } from "@/components/common/JsonCollapse";
 import { Skeleton } from "@/components/common/Skeleton";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useJobDetailQuery, useJobStatusQuery } from "@/hooks/queries/useJobDetailQuery";
-import { usePollCiMutation, useRerunMutation } from "@/hooks/queries/useRerunMutation";
+import { useRerunMutation } from "@/hooks/queries/useRerunMutation";
 import { formatDate } from "@/utils/format";
 
 export function JobDetailPage() {
@@ -16,7 +16,6 @@ export function JobDetailPage() {
   const detailQuery = useJobDetailQuery(jobId);
   const statusQuery = useJobStatusQuery(jobId);
   const rerunMutation = useRerunMutation(jobId);
-  const pollMutation = usePollCiMutation(jobId);
 
   if (!jobId) {
     return <EmptyState title="No Job Selected" description="Pick a job from the jobs page to inspect details." />;
@@ -52,19 +51,6 @@ export function JobDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge value={statusQuery.data?.ci_status || detail.ci_status || detail.status} />
             <button
-              className="focus-ring rounded-lg border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-2 text-xs font-semibold text-accent-cyan"
-              onClick={async () => {
-                try {
-                  await pollMutation.mutateAsync();
-                  toast.success("CI status refreshed");
-                } catch (error) {
-                  toast.error((error as Error).message);
-                }
-              }}
-            >
-              Poll CI
-            </button>
-            <button
               className="focus-ring rounded-lg border border-accent-magenta/40 bg-accent-magenta/15 px-3 py-2 text-xs font-semibold text-accent-magenta"
               onClick={async () => {
                 try {
@@ -88,7 +74,7 @@ export function JobDetailPage() {
           <InfoItem label="Filename" value={detail.original_filename || "-"} />
           <InfoItem label="Quality score" value={detail.quality_score?.toString() || "-"} />
           <InfoItem label="Commit SHA" value={detail.commit_sha || "-"} mono />
-          <InfoItem label="CI updated" value={formatDate(detail.ci_updated_at)} />
+          <InfoItem label="Status updated" value={formatDate(detail.ci_updated_at)} />
         </div>
       </Card>
 
@@ -151,7 +137,7 @@ export function JobDetailPage() {
             <InfoItem label="Fail" value={String(detail.latest_run.fail_count)} />
             <InfoItem label="Error" value={String(detail.latest_run.error_count)} />
             <InfoItem label="Coverage" value={`${detail.latest_run.coverage_percentage}%`} />
-            <InfoItem label="CI URL" value={detail.latest_run.ci_run_url || "-"} />
+            <InfoItem label="Run URL" value={detail.latest_run.ci_run_url || "-"} />
           </div>
         ) : (
           <p className="text-sm text-slate-400">No test run stats available.</p>

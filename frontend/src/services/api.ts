@@ -43,11 +43,6 @@ export async function rerunJob(jobId: string): Promise<RerunResult> {
   return data;
 }
 
-export async function pollCi(jobId: string): Promise<JobStatusView> {
-  const { data } = await apiClient.post<JobStatusView>(`/jobs/${jobId}/ci/poll`);
-  return data;
-}
-
 export async function fetchJobStatus(jobId: string): Promise<JobStatusView> {
   const { data } = await apiClient.get<JobStatusView>(`/jobs/${jobId}/status`);
   return data;
