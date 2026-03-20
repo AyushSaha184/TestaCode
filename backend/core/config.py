@@ -42,7 +42,7 @@ class Settings(BaseModel):
 	parser_cache_ttl_seconds: int = Field(default=int(os.getenv("PARSER_CACHE_TTL_SECONDS", "600")))
 	intent_cache_ttl_seconds: int = Field(default=int(os.getenv("INTENT_CACHE_TTL_SECONDS", "600")))
 	idempotency_ttl_seconds: int = Field(default=int(os.getenv("IDEMPOTENCY_TTL_SECONDS", "3600")))
-	use_redis_cache: bool = Field(default=os.getenv("USE_REDIS_CACHE", "false").lower() == "true")
+	use_redis_cache: bool = Field(default=os.getenv("USE_REDIS_CACHE", "true").lower() == "true")
 	redis_url: str = Field(default=os.getenv("REDIS_URL", ""))
 	redis_host: str = Field(default=os.getenv("REDIS_HOST", ""))
 	redis_port: int = Field(default=int(os.getenv("REDIS_PORT", "6379")))

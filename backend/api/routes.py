@@ -13,7 +13,15 @@ from backend.core.config import get_settings
 from backend.input.normalizer import normalize_generation_request
 from backend.repositories.generation_repository import GenerationRepository
 from backend.services.supabase_storage_service import SupabaseStorageService
-from backend.schemas import GenerationResponse, JobDetail, JobStatusView, JobSummary, RerunResult
+from backend.schemas import (
+    GenerationResponse,
+    JobDetail,
+    JobFeedbackRequest,
+    JobFeedbackResponse,
+    JobStatusView,
+    JobSummary,
+    RerunResult,
+)
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -103,3 +111,26 @@ def get_job_status(
     orchestrator: GenerationOrchestrator = Depends(get_orchestrator),
 ) -> JobStatusView:
     return orchestrator.get_status(job_id, session_id=session_id)
+
+
+@router.post("/jobs/{job_id}/feedback", response_model=JobFeedbackResponse)
+def submit_job_feedback(
+    job_id: UUID,
+    payload: JobFeedbackRequest,
+    session_id: Annotated[str, Header(alias="X-Session-Id")],
+    repository: GenerationRepository = Depends(get_repository),
+) -> JobFeedbackResponse:
+    if not repository.get_job_record(job_id, session_id=session_id):
+        raise AppError("Job not found", status_code=404)
+    return repository.upsert_job_feedback(job_id=job_id, session_id=session_id, payload=payload)
+
+
+@router.get("/jobs/{job_id}/feedback", response_model=JobFeedbackResponse | None)
+def get_job_feedback(
+    job_id: UUID,
+    session_id: Annotated[str, Header(alias="X-Session-Id")],
+    repository: GenerationRepository = Depends(get_repository),
+) -> JobFeedbackResponse | None:
+    if not repository.get_job_record(job_id, session_id=session_id):
+        raise AppError("Job not found", status_code=404)
+    return repository.get_job_feedback(job_id=job_id, session_id=session_id)

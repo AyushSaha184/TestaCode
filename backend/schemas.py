@@ -27,6 +27,11 @@ class JobStatus(str, Enum):
 	failed = "failed"
 
 
+class FeedbackValue(str, Enum):
+	up = "up"
+	down = "down"
+
+
 class TestType(str, Enum):
 	unit = "unit"
 	integration = "integration"
@@ -187,6 +192,47 @@ class JobStatusView(BaseModel):
 	ci_run_url: str | None = None
 	ci_run_id: str | None = None
 	ci_updated_at: datetime | None = None
+
+
+class JobFeedbackRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+
+	feedback_value: FeedbackValue
+	correction_text: str | None = None
+	reviewer_notes: str | None = None
+
+
+class JobFeedbackResponse(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+
+	id: UUID
+	job_id: UUID
+	session_id: str
+	feedback_value: FeedbackValue
+	correction_text: str | None = None
+	reviewer_notes: str | None = None
+	detected_language: Language
+	user_prompt_snapshot: str
+	generated_test_code_snapshot: str | None = None
+	quality_score_snapshot: int | None = None
+	framework_used_snapshot: str | None = None
+	source_code_snapshot: str | None = None
+	classified_intent_snapshot: dict[str, Any] = Field(default_factory=dict)
+	created_at: datetime
+	updated_at: datetime
+
+
+class PositiveFeedbackExample(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+
+	job_id: UUID
+	detected_language: Language
+	framework_used_snapshot: str | None = None
+	generated_test_code_snapshot: str | None = None
+	correction_text: str | None = None
+	reviewer_notes: str | None = None
+	quality_score_snapshot: int | None = None
+	created_at: datetime
 
 
 class UnifiedContext(BaseModel):

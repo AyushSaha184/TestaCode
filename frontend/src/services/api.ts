@@ -2,6 +2,8 @@ import { apiClient } from "@/services/http";
 import type {
   GeneratePayload,
   GenerationResponse,
+  JobFeedback,
+  JobFeedbackPayload,
   JobDetail,
   JobsQueryParams,
   JobStatusView,
@@ -45,5 +47,15 @@ export async function rerunJob(jobId: string): Promise<RerunResult> {
 
 export async function fetchJobStatus(jobId: string): Promise<JobStatusView> {
   const { data } = await apiClient.get<JobStatusView>(`/jobs/${jobId}/status`);
+  return data;
+}
+
+export async function fetchJobFeedback(jobId: string): Promise<JobFeedback | null> {
+  const { data } = await apiClient.get<JobFeedback | null>(`/jobs/${jobId}/feedback`);
+  return data;
+}
+
+export async function submitJobFeedback(jobId: string, payload: JobFeedbackPayload): Promise<JobFeedback> {
+  const { data } = await apiClient.post<JobFeedback>(`/jobs/${jobId}/feedback`, payload);
   return data;
 }

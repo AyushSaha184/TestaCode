@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Card } from "@/components/common/Card";
@@ -8,7 +9,9 @@ import { JsonCollapse } from "@/components/common/JsonCollapse";
 import { Skeleton } from "@/components/common/Skeleton";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useJobDetailQuery, useJobStatusQuery } from "@/hooks/queries/useJobDetailQuery";
+import { useJobFeedbackQuery, useSubmitJobFeedbackMutation } from "@/hooks/queries/useJobFeedbackQuery";
 import { useRerunMutation } from "@/hooks/queries/useRerunMutation";
+import type { FeedbackValue } from "@/types/api";
 import { formatDate } from "@/utils/format";
 
 export function JobDetailPage() {
@@ -16,6 +19,20 @@ export function JobDetailPage() {
   const detailQuery = useJobDetailQuery(jobId);
   const statusQuery = useJobStatusQuery(jobId);
   const rerunMutation = useRerunMutation(jobId);
+  const feedbackQuery = useJobFeedbackQuery(jobId);
+  const submitFeedbackMutation = useSubmitJobFeedbackMutation(jobId);
+  const [feedbackValue, setFeedbackValue] = useState<FeedbackValue | null>(null);
+  const [correctionText, setCorrectionText] = useState("");
+  const [reviewerNotes, setReviewerNotes] = useState("");
+
+  useEffect(() => {
+    if (!feedbackQuery.data) {
+      return;
+    }
+    setFeedbackValue(feedbackQuery.data.feedback_value);
+    setCorrectionText(feedbackQuery.data.correction_text || "");
+    setReviewerNotes(feedbackQuery.data.reviewer_notes || "");
+  }, [feedbackQuery.data]);
 
   if (!jobId) {
     return <EmptyState title="No Job Selected" description="Pick a job from the jobs page to inspect details." />;
@@ -94,6 +111,94 @@ export function JobDetailPage() {
         <h4 className="font-semibold text-white">Generated Test Code</h4>
         <div className="overflow-hidden rounded-lg border border-white/10">
           <CodeViewer code={detail.generated_test_code || ""} language={detail.detected_language} />
+        </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="font-semibold text-white">Human Feedback</h4>
+          {feedbackQuery.data ? (
+            <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+              Saved {formatDate(feedbackQuery.data.updated_at)}
+            </span>
+          ) : (
+            <span className="rounded-full border border-slate-400/30 bg-slate-500/10 px-2 py-1 text-xs text-slate-300">Not reviewed</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFeedbackValue("up")}
+            className={`focus-ring rounded-lg border px-3 py-2 text-sm font-medium ${
+              feedbackValue === "up"
+                ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
+                : "border-white/20 bg-ink-900/70 text-slate-200"
+            }`}
+          >
+            Thumbs up
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeedbackValue("down")}
+            className={`focus-ring rounded-lg border px-3 py-2 text-sm font-medium ${
+              feedbackValue === "down"
+                ? "border-accent-red/60 bg-accent-red/20 text-accent-red"
+                : "border-white/20 bg-ink-900/70 text-slate-200"
+            }`}
+          >
+            Thumbs down
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="grid gap-2">
+            <span className="text-xs text-slate-400">Correction / suggestion</span>
+            <textarea
+              value={correctionText}
+              onChange={(event) => setCorrectionText(event.target.value)}
+              rows={5}
+              className="focus-ring w-full rounded-lg border border-white/15 bg-ink-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              placeholder="Optional: suggest exact test improvements or missing cases"
+            />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-xs text-slate-400">Reviewer notes</span>
+            <textarea
+              value={reviewerNotes}
+              onChange={(event) => setReviewerNotes(event.target.value)}
+              rows={5}
+              className="focus-ring w-full rounded-lg border border-white/15 bg-ink-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              placeholder="Optional: rationale or quality notes"
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-slate-400">Feedback is session-scoped and stored for future evaluation/few-shot datasets.</p>
+          <button
+            type="button"
+            disabled={!feedbackValue || submitFeedbackMutation.isPending}
+            onClick={async () => {
+              if (!feedbackValue) {
+                toast.error("Select thumbs up or thumbs down first");
+                return;
+              }
+              try {
+                await submitFeedbackMutation.mutateAsync({
+                  feedback_value: feedbackValue,
+                  correction_text: correctionText.trim() || undefined,
+                  reviewer_notes: reviewerNotes.trim() || undefined,
+                });
+                toast.success("Feedback saved");
+              } catch (error) {
+                toast.error((error as Error).message);
+              }
+            }}
+            className="focus-ring rounded-lg border border-accent-cyan/40 bg-accent-cyan/15 px-3 py-2 text-xs font-semibold text-accent-cyan disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitFeedbackMutation.isPending ? "Saving..." : "Save feedback"}
+          </button>
         </div>
       </Card>
 

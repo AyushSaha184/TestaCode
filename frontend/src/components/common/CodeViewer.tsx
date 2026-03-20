@@ -7,7 +7,7 @@ interface CodeViewerProps {
   language: Language;
   readOnly?: boolean;
   onChange?: (next: string) => void;
-  height?: number;
+  height?: number | string;
 }
 
 function toMonacoLang(language: Language): string {
@@ -26,6 +26,8 @@ export function CodeViewer({ code, language, readOnly = true, onChange, height =
       roundedSelection: true,
       scrollBeyondLastLine: false,
       automaticLayout: true,
+      wordWrap: "on" as const,
+      wrappingIndent: "same" as const,
       padding: { top: 14, bottom: 14 },
     }),
     [readOnly],

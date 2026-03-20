@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from backend.repositories.generation_repository import GenerationRepository
+from backend.schemas import FeedbackValue, JobFeedbackRequest, Language
 
 
 class FakeDb:
@@ -18,6 +19,33 @@ class FakeDb:
     def fetchone(self, query: str, params=()):
         self.last_query = query
         self.last_params = params
+        if "SELECT detected_language" in query and "FROM generation_jobs" in query:
+            return {
+                "detected_language": "python",
+                "user_prompt": "Generate",
+                "generated_test_code": "def test_ok(): pass",
+                "quality_score": 8,
+                "framework_used": "pytest",
+                "classified_intent": {"test_type": "unit"},
+            }
+        if "INSERT INTO generation_job_feedback" in query:
+            return {
+                "id": uuid4(),
+                "job_id": params[1],
+                "session_id": params[2],
+                "feedback_value": params[3],
+                "correction_text": params[4],
+                "reviewer_notes": params[5],
+                "detected_language": params[6],
+                "user_prompt_snapshot": params[7],
+                "generated_test_code_snapshot": params[8],
+                "quality_score_snapshot": params[9],
+                "framework_used_snapshot": params[10],
+                "source_code_snapshot": params[11],
+                "classified_intent_snapshot": {"test_type": "unit"},
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
         if "FROM generation_jobs" in query:
             return {
                 "id": uuid4(),
@@ -56,6 +84,19 @@ class FakeDb:
     def fetchall(self, query: str, params=()):
         self.last_query = query
         self.last_params = params
+        if "FROM generation_job_feedback" in query:
+            return [
+                {
+                    "job_id": uuid4(),
+                    "detected_language": "python",
+                    "framework_used_snapshot": "pytest",
+                    "generated_test_code_snapshot": "def test_x(): pass",
+                    "correction_text": None,
+                    "reviewer_notes": "Solid coverage",
+                    "quality_score_snapshot": 9,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            ]
         return []
 
 
@@ -96,3 +137,40 @@ def test_get_job_maps_artifact_url_fields() -> None:
     assert job.output_metadata_path == "sessions/s1/python/add/test_add.json"
     assert job.output_test_url == "https://storage.local/test_add.py"
     assert job.output_metadata_url == "https://storage.local/test_add.json"
+
+
+def test_upsert_job_feedback_stores_snapshot_context() -> None:
+    db = FakeDb()
+    repo = GenerationRepository(db)
+    job_id = uuid4()
+
+    feedback = repo.upsert_job_feedback(
+        job_id=job_id,
+        session_id="session-test-1",
+        payload=JobFeedbackRequest(
+            feedback_value=FeedbackValue.up,
+            correction_text="Add exception path",
+            reviewer_notes="Great baseline",
+        ),
+    )
+
+    assert "INSERT INTO generation_job_feedback" in db.last_query
+    assert feedback.job_id == job_id
+    assert feedback.feedback_value == FeedbackValue.up
+    assert feedback.framework_used_snapshot == "pytest"
+
+
+def test_recent_positive_feedback_examples_filters_by_language_and_framework() -> None:
+    db = FakeDb()
+    repo = GenerationRepository(db)
+
+    examples = repo.get_recent_positive_feedback_examples(
+        session_id="session-test-1",
+        language=Language.python,
+        framework_used="pytest",
+        limit=3,
+    )
+
+    assert len(examples) == 1
+    assert examples[0].detected_language == Language.python
+    assert examples[0].framework_used_snapshot == "pytest"

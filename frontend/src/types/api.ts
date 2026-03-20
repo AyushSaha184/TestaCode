@@ -1,6 +1,7 @@
 export type InputMode = "paste" | "upload";
 export type Language = "python" | "javascript" | "typescript" | "java";
 export type JobStatus = "queued" | "processing" | "completed" | "failed";
+export type FeedbackValue = "up" | "down";
 
 export interface GenerationResponse {
   job_id: string;
@@ -86,6 +87,30 @@ export interface JobStatusView {
   ci_run_url?: string | null;
   ci_run_id?: string | null;
   ci_updated_at?: string | null;
+}
+
+export interface JobFeedback {
+  id: string;
+  job_id: string;
+  session_id: string;
+  feedback_value: FeedbackValue;
+  correction_text?: string | null;
+  reviewer_notes?: string | null;
+  detected_language: Language;
+  user_prompt_snapshot: string;
+  generated_test_code_snapshot?: string | null;
+  quality_score_snapshot?: number | null;
+  framework_used_snapshot?: string | null;
+  source_code_snapshot?: string | null;
+  classified_intent_snapshot: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobFeedbackPayload {
+  feedback_value: FeedbackValue;
+  correction_text?: string;
+  reviewer_notes?: string;
 }
 
 export interface JobsQueryParams {

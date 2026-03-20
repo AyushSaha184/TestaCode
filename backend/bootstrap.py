@@ -77,14 +77,18 @@ def get_orchestrator() -> GenerationOrchestrator:
         try:
             redis_client = _create_redis_client(settings)
             if redis_client is None:
-                raise ValueError("Redis enabled but REDIS_URL or REDIS_HOST is not configured")
-            redis_client.ping()
-            parser_cache = RedisTTLCache(redis_client, settings.parser_cache_ttl_seconds, f"{settings.redis_key_prefix}:parser")
-            intent_cache = RedisTTLCache(redis_client, settings.intent_cache_ttl_seconds, f"{settings.redis_key_prefix}:intent")
-            idempotency_cache = RedisTTLCache(redis_client, settings.idempotency_ttl_seconds, f"{settings.redis_key_prefix}:idempotency")
-            logger.info("redis_cache_enabled", extra={"step": "cache", "status": "ok"})
+                logger.warning(
+                    "redis_cache_unconfigured_fallback",
+                    extra={"step": "cache", "status": "fallback"},
+                )
+            else:
+                redis_client.ping()
+                parser_cache = RedisTTLCache(redis_client, settings.parser_cache_ttl_seconds, f"{settings.redis_key_prefix}:parser")
+                intent_cache = RedisTTLCache(redis_client, settings.intent_cache_ttl_seconds, f"{settings.redis_key_prefix}:intent")
+                idempotency_cache = RedisTTLCache(redis_client, settings.idempotency_ttl_seconds, f"{settings.redis_key_prefix}:idempotency")
+                logger.info("redis_cache_enabled", extra={"step": "cache", "status": "ok"})
         except Exception:
-            logger.exception("redis_cache_init_failed", extra={"step": "cache", "status": "failed"})
+            logger.exception("redis_cache_init_failed", extra={"step": "cache", "status": "fallback"})
 
     parser_service = ParserService(ttl_seconds=settings.parser_cache_ttl_seconds, cache=parser_cache)
     js_ts_parser = JavaScriptTypeScriptParser(llm)

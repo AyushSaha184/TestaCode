@@ -6,7 +6,19 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from backend.core.database import DatabaseClient
-from backend.schemas import GenerationRequest, InputMode, JobDetail, JobStatus, JobSummary, Language, TestRunResultModel
+from backend.schemas import (
+    FeedbackValue,
+    GenerationRequest,
+    InputMode,
+    JobDetail,
+    JobFeedbackRequest,
+    JobFeedbackResponse,
+    JobStatus,
+    JobSummary,
+    Language,
+    PositiveFeedbackExample,
+    TestRunResultModel,
+)
 
 
 class GenerationRepository:
@@ -291,9 +303,146 @@ class GenerationRepository:
             raise RuntimeError("Database health check failed")
         return row["ts"]
 
+    def upsert_job_feedback(self, job_id: UUID, session_id: str, payload: JobFeedbackRequest) -> JobFeedbackResponse:
+        snapshot = self.db.fetchone(
+            """
+            SELECT detected_language, user_prompt, generated_test_code, quality_score, framework_used, classified_intent
+            FROM generation_jobs
+            WHERE id = %s AND session_id = %s
+            """,
+            (job_id, session_id),
+        )
+        if not snapshot:
+            raise RuntimeError("Cannot upsert feedback for missing job")
+
+        row = self.db.fetchone(
+            """
+            INSERT INTO generation_job_feedback (
+                id,
+                job_id,
+                session_id,
+                feedback_value,
+                correction_text,
+                reviewer_notes,
+                detected_language,
+                user_prompt_snapshot,
+                generated_test_code_snapshot,
+                quality_score_snapshot,
+                framework_used_snapshot,
+                source_code_snapshot,
+                classified_intent_snapshot
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb
+            )
+            ON CONFLICT (job_id, session_id)
+            DO UPDATE SET
+                feedback_value = EXCLUDED.feedback_value,
+                correction_text = EXCLUDED.correction_text,
+                reviewer_notes = EXCLUDED.reviewer_notes,
+                detected_language = EXCLUDED.detected_language,
+                user_prompt_snapshot = EXCLUDED.user_prompt_snapshot,
+                generated_test_code_snapshot = EXCLUDED.generated_test_code_snapshot,
+                quality_score_snapshot = EXCLUDED.quality_score_snapshot,
+                framework_used_snapshot = EXCLUDED.framework_used_snapshot,
+                source_code_snapshot = EXCLUDED.source_code_snapshot,
+                classified_intent_snapshot = EXCLUDED.classified_intent_snapshot,
+                updated_at = NOW()
+            RETURNING *
+            """,
+            (
+                uuid4(),
+                job_id,
+                session_id,
+                payload.feedback_value.value,
+                payload.correction_text,
+                payload.reviewer_notes,
+                snapshot["detected_language"],
+                snapshot["user_prompt"],
+                snapshot.get("generated_test_code"),
+                snapshot.get("quality_score"),
+                snapshot.get("framework_used"),
+                None,
+                _to_json(snapshot.get("classified_intent") or {}),
+            ),
+        )
+        if not row:
+            raise RuntimeError("Failed to persist job feedback")
+        return _row_to_job_feedback(row)
+
+    def get_job_feedback(self, job_id: UUID, session_id: str) -> JobFeedbackResponse | None:
+        row = self.db.fetchone(
+            "SELECT * FROM generation_job_feedback WHERE job_id = %s AND session_id = %s",
+            (job_id, session_id),
+        )
+        if not row:
+            return None
+        return _row_to_job_feedback(row)
+
+    def get_recent_positive_feedback_examples(
+        self,
+        *,
+        session_id: str,
+        language: Language,
+        framework_used: str | None,
+        limit: int = 5,
+    ) -> list[PositiveFeedbackExample]:
+        framework_clause = "AND framework_used_snapshot = %s" if framework_used else ""
+        params: list[Any] = [session_id, language.value]
+        if framework_used:
+            params.append(framework_used)
+        params.append(limit)
+
+        rows = self.db.fetchall(
+            f"""
+            SELECT job_id, detected_language, framework_used_snapshot, generated_test_code_snapshot,
+                   correction_text, reviewer_notes, quality_score_snapshot, created_at
+            FROM generation_job_feedback
+            WHERE session_id = %s
+              AND detected_language = %s
+              AND feedback_value = 'up'
+              {framework_clause}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            tuple(params),
+        )
+        return [
+            PositiveFeedbackExample(
+                job_id=row["job_id"],
+                detected_language=Language(row["detected_language"]),
+                framework_used_snapshot=row.get("framework_used_snapshot"),
+                generated_test_code_snapshot=row.get("generated_test_code_snapshot"),
+                correction_text=row.get("correction_text"),
+                reviewer_notes=row.get("reviewer_notes"),
+                quality_score_snapshot=row.get("quality_score_snapshot"),
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
 
 import json
 
 
 def _to_json(value: Any) -> str:
     return json.dumps(value, default=str)
+
+
+def _row_to_job_feedback(row: dict[str, Any]) -> JobFeedbackResponse:
+    return JobFeedbackResponse(
+        id=row["id"],
+        job_id=row["job_id"],
+        session_id=row["session_id"],
+        feedback_value=FeedbackValue(row["feedback_value"]),
+        correction_text=row.get("correction_text"),
+        reviewer_notes=row.get("reviewer_notes"),
+        detected_language=Language(row["detected_language"]),
+        user_prompt_snapshot=row["user_prompt_snapshot"],
+        generated_test_code_snapshot=row.get("generated_test_code_snapshot"),
+        quality_score_snapshot=row.get("quality_score_snapshot"),
+        framework_used_snapshot=row.get("framework_used_snapshot"),
+        source_code_snapshot=row.get("source_code_snapshot"),
+        classified_intent_snapshot=row.get("classified_intent_snapshot") or {},
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )

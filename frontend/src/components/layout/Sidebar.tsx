@@ -49,34 +49,6 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             </ul>
           </div>
 
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-magenta">What You Get</h3>
-            <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
-              <li>Deterministic test artifacts with consistent formatting.</li>
-              <li>Unified handling for prompt-only, pasted code, and file-upload inputs.</li>
-              <li>Quality diagnostics: score, blind spots, and generation warnings.</li>
-              <li>Optional auto-commit workflow for generated tests.</li>
-              <li>Saved artifacts and job history for follow-up review.</li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-blue">Architecture</h3>
-            <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
-              <li>Frontend: React + Vite + TypeScript + TanStack Query + Zustand.</li>
-              <li>Backend: FastAPI orchestration with parser, intent, and generation agents.</li>
-              <li>Storage: Supabase Postgres for jobs and generated output metadata.</li>
-              <li>Caching: TTL-based cache with optional Redis-backed acceleration.</li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-green">Session Behavior</h3>
-            <p className="mt-2 text-xs leading-relaxed text-slate-300">
-              Each page load creates a fresh client session ID to reduce cross-session mixing and keep request context
-              isolated while you iterate on prompts and code.
-            </p>
-          </div>
         </div>
       </section>
     </aside>

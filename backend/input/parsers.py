@@ -86,8 +86,23 @@ class ParserService:
 		self.python_parser = PythonFunctionParser()
 
 	def _cache_key(self, session_id: str, language: Language, code: str) -> str:
-		digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+		digest = self._content_hash(language, code)
 		return f"{session_id}:{language.value}:{digest}"
+
+	def _content_hash(self, language: Language, code: str) -> str:
+		if language != Language.python:
+			return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+		try:
+			tree = ast.parse(code)
+		except SyntaxError:
+			logger.warning("python_ast_hash_fallback_raw", extra={"step": "parser", "status": "fallback"})
+			return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+		# include_attributes=False keeps the hash insensitive to formatting and comments,
+		# while preserving docstring and callable structure represented in the AST.
+		canonical = ast.dump(tree, annotate_fields=True, include_attributes=False)
+		return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 	def get_cached(self, session_id: str, language: Language, code: str) -> list[FunctionMetadata] | None:
 		return self.cache.get(self._cache_key(session_id, language, code))

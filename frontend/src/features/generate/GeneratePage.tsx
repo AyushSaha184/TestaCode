@@ -9,35 +9,98 @@ import type { InputMode, Language } from "@/types/api";
 
 const CLEAR_FORM_EVENT = "testacode:clear-generate-form";
 const DEFAULT_CODE = "";
+const LANGUAGE_OPTIONS: Array<{ label: string; value: Language }> = [
+  { label: "Python", value: "python" },
+  { label: "JavaScript", value: "javascript" },
+  { label: "TypeScript", value: "typescript" },
+  { label: "Java", value: "java" },
+];
 
 function detectLanguageFromCode(source: string): Language {
   const code = source.trim();
   if (!code) return "python";
 
-  if (/\bpackage\s+[\w.]+\s*;|\bpublic\s+class\b|\bSystem\.out\.println\b/.test(code)) {
-    return "java";
+  const checks: Array<{ language: Language; patterns: RegExp[] }> = [
+    {
+      language: "python",
+      patterns: [
+        /^\s*def\s+\w+\s*\(/m,
+        /^\s*class\s+\w+\s*[:(]/m,
+        /^\s*from\s+[\w.]+\s+import\s+/m,
+        /^\s*import\s+[\w.]+/m,
+        /\bself\b/,
+        /__name__\s*==\s*["']__main__["']/,
+        /\bprint\s*\(/,
+      ],
+    },
+    {
+      language: "typescript",
+      patterns: [
+        /\binterface\s+\w+/,
+        /\btype\s+\w+\s*=/,
+        /\benum\s+\w+/,
+        /\bimplements\s+\w+/,
+        /\breadonly\s+\w+/,
+        /:\s*(string|number|boolean|unknown|never|any|void)\b/,
+        /\b(public|private|protected)\s+\w+/,
+        /\bas\s+const\b/,
+      ],
+    },
+    {
+      language: "java",
+      patterns: [
+        /^\s*package\s+[\w.]+\s*;/m,
+        /^\s*import\s+java\./m,
+        /\bpublic\s+(class|interface|enum)\s+\w+/,
+        /\bSystem\.out\.println\s*\(/,
+        /\bString\[\]\s+args\b/,
+        /@\w+\s+public\s+/,
+      ],
+    },
+    {
+      language: "javascript",
+      patterns: [
+        /\bfunction\s+\w+\s*\(/,
+        /\b(const|let|var)\s+\w+/,
+        /=>/,
+        /\bconsole\.log\s*\(/,
+        /\brequire\s*\(/,
+        /\bmodule\.exports\b/,
+        /\bexport\s+default\b/,
+      ],
+    },
+  ];
+
+  const bestMatch = checks
+    .map(({ language, patterns }) => ({
+      language,
+      score: patterns.reduce((total, pattern) => total + (pattern.test(code) ? 1 : 0), 0),
+    }))
+    .sort((left, right) => right.score - left.score)[0];
+
+  if (!bestMatch || bestMatch.score === 0) {
+    return "python";
   }
-  if (/\binterface\s+\w+\b|\btype\s+\w+\s*=|:\s*(string|number|boolean)\b|\bimplements\b/.test(code)) {
-    return "typescript";
-  }
-  if (/\bfunction\b|\bconst\b|\blet\b|=>|\bconsole\.log\b/.test(code)) {
-    return "javascript";
-  }
-  return "python";
+
+  return bestMatch.language;
 }
 
 export function GeneratePage() {
   const [userPrompt, setUserPrompt] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE);
-  const [detectedLanguage, setDetectedLanguage] = useState<Language>(detectLanguageFromCode(DEFAULT_CODE));
+  const [autoDetectedLanguage, setAutoDetectedLanguage] = useState<Language>(detectLanguageFromCode(DEFAULT_CODE));
+  const [languageMode, setLanguageMode] = useState<"auto" | Language>("auto");
   const [filename, setFilename] = useState("");
-  const [autoCommitEnabled, setAutoCommitEnabled] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | undefined>();
   const [fileInputKey, setFileInputKey] = useState(0);
 
   const generateMutation = useGenerateMutation();
 
-  const generatedCodeLanguage = useMemo(() => detectedLanguage, [detectedLanguage]);
+  const effectiveLanguage = useMemo(
+    () => (languageMode === "auto" ? autoDetectedLanguage : languageMode),
+    [autoDetectedLanguage, languageMode],
+  );
+  const generatedCodeLanguage = useMemo(() => effectiveLanguage, [effectiveLanguage]);
   const inputMode: InputMode = uploadFile ? "upload" : "paste";
 
   useEffect(() => {
@@ -45,7 +108,8 @@ export function GeneratePage() {
       setUserPrompt("");
       setUploadFile(undefined);
       setCode("");
-      setDetectedLanguage("python");
+      setAutoDetectedLanguage("python");
+      setLanguageMode("auto");
       setFilename("");
       setFileInputKey((previous) => previous + 1);
       generateMutation.reset();
@@ -66,10 +130,9 @@ export function GeneratePage() {
         input_mode: inputMode,
         user_prompt: userPrompt,
         code_content: code,
-        language: inputMode === "paste" ? detectedLanguage : undefined,
+        language: inputMode === "paste" ? effectiveLanguage : undefined,
         filename: filename || undefined,
         upload_file: uploadFile,
-        auto_commit_enabled: autoCommitEnabled,
       });
       toast.success(`Generated tests for job ${response.job_id}`);
     } catch (error) {
@@ -80,84 +143,98 @@ export function GeneratePage() {
   const response = generateMutation.data;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(300px,1.1fr)_minmax(400px,1fr)]">
-      <Card>
-        <div className="mb-4">
+    <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.98fr)_minmax(360px,1.02fr)]">
+      <Card className="xl:flex xl:h-[calc(100vh-7.5rem)] xl:flex-col">
+        <div className="mb-3">
           <h3 className="text-lg font-semibold text-white">Generate Tests</h3>
           <p className="text-sm text-slate-400">Paste source code or upload a file to generate robust tests.</p>
         </div>
 
-        <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-slate-300">User Prompt</span>
-          <textarea
-            className="focus-ring h-24 w-full rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-slate-100"
-            value={userPrompt}
-            onChange={(event) => setUserPrompt(event.target.value)}
-            placeholder="Describe intent, edge cases, framework preference..."
-          />
-        </label>
-
-        <div className="mb-3 rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
-          Detected language: <span className="font-semibold text-white">{detectedLanguage}</span>
-        </div>
-
-        <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-slate-300">Upload File (optional)</span>
-          <input
-            key={fileInputKey}
-            type="file"
-            className="focus-ring w-full rounded-lg border border-dashed border-white/20 bg-ink-900 px-3 py-3"
-            onChange={(event) => {
-              const nextFile = event.target.files?.[0];
-              setUploadFile(nextFile);
-              if (nextFile) {
-                setFilename(nextFile.name);
-              }
-            }}
-          />
-          <p className="mt-1 text-xs text-slate-400">If a file is selected, upload mode is used automatically.</p>
-        </label>
-
-        <div className="overflow-hidden rounded-lg border border-white/10">
-          <CodeViewer
-            code={code}
-            language={detectedLanguage}
-            readOnly={false}
-            onChange={(nextCode) => {
-              setCode(nextCode);
-              setDetectedLanguage(detectLanguageFromCode(nextCode));
-            }}
-            height={300}
-          />
-        </div>
-
-        <div className="mt-3 grid gap-3">
-          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={autoCommitEnabled}
-              onChange={(event) => setAutoCommitEnabled(event.target.checked)}
-              className="h-4 w-4 accent-cyan-400"
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <label className="block text-sm">
+            <span className="mb-1 block text-slate-300">User Prompt</span>
+            <textarea
+              className="focus-ring h-20 w-full resize-none rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-slate-100"
+              value={userPrompt}
+              onChange={(event) => setUserPrompt(event.target.value)}
+              placeholder="Describe intent, edge cases, framework preference..."
             />
-            <span>Auto commit enabled</span>
           </label>
-        </div>
 
-        <button
-          className="focus-ring mt-4 w-full rounded-lg bg-gradient-to-r from-accent-blue to-accent-magenta px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-          onClick={submit}
-          disabled={generateMutation.isPending}
-        >
-          {generateMutation.isPending ? "Generating..." : "Generate Tests"}
-        </button>
+          <div className="rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-sm text-slate-300">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-2">
+                <span>
+                  Editor language: <span className="font-semibold text-white">{effectiveLanguage}</span>
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                  {languageMode === "auto" ? "Auto Detected" : "Manual"}
+                </span>
+              </div>
+              <label className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-400">
+                <span>Mode</span>
+                <select
+                  className="focus-ring rounded-md border border-white/10 bg-ink-950 px-2 py-1 text-sm text-slate-100"
+                  value={languageMode}
+                  onChange={(event) => setLanguageMode(event.target.value as "auto" | Language)}
+                >
+                  <option value="auto">Auto-detect</option>
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <label className="block text-sm">
+            <span className="mb-1 block text-slate-300">Upload File (optional)</span>
+            <input
+              key={fileInputKey}
+              type="file"
+              className="focus-ring w-full rounded-lg border border-dashed border-white/20 bg-ink-900 px-3 py-2.5"
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0];
+                setUploadFile(nextFile);
+                if (nextFile) {
+                  setFilename(nextFile.name);
+                }
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-400">If a file is selected, upload mode is used automatically.</p>
+          </label>
+
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-white/10">
+            <CodeViewer
+              code={code}
+              language={effectiveLanguage}
+              readOnly={false}
+              onChange={(nextCode) => {
+                setCode(nextCode);
+                setAutoDetectedLanguage(detectLanguageFromCode(nextCode));
+              }}
+              height="100%"
+            />
+          </div>
+
+          <button
+            className="focus-ring w-full rounded-lg bg-gradient-to-r from-accent-blue to-accent-magenta px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            onClick={submit}
+            disabled={generateMutation.isPending}
+          >
+            {generateMutation.isPending ? "Generating..." : "Generate Tests"}
+          </button>
+        </div>
       </Card>
 
-      <Card>
+      <Card className="xl:flex xl:h-[calc(100vh-7.5rem)] xl:flex-col">
         <h3 className="mb-3 text-lg font-semibold text-white">Output</h3>
         {!response ? (
           <p className="text-sm text-slate-400">Generated tests, quality score, and warnings will appear here.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="min-h-0 space-y-3 xl:flex-1 xl:overflow-y-auto">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge value={response.ci_status || "completed"} />
               <span className="rounded-full border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-1 text-xs font-semibold text-accent-cyan">
@@ -210,7 +287,7 @@ export function GeneratePage() {
             </div>
 
             <div className="overflow-hidden rounded-lg border border-white/10">
-              <CodeViewer code={response.generated_test_code || ""} language={generatedCodeLanguage} height={360} />
+              <CodeViewer code={response.generated_test_code || ""} language={generatedCodeLanguage} height={320} />
             </div>
           </div>
         )}

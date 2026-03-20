@@ -16,7 +16,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 - Session-isolated generation requests via `X-Session-Id`
 - Multi-stage backend pipeline: normalize -> parse -> classify -> analyze -> generate -> validate/correct -> self-evaluate -> persist
 - Postgres-backed job lifecycle with migration-based schema contracts
-- Optional Redis caches for parser results, intent classification, and idempotency
+- Redis-first caches for parser results, intent classification, and idempotency, with in-process TTL fallback
 - Optional Supabase Storage upload with signed/public artifact URLs
 - Optional Git auto-commit and push workflow for generated artifacts
 - Frontend dashboard for generation, job history, job detail, rerun, and analytics
@@ -43,6 +43,8 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
    - `upload`: UTF-8 source file upload with strict extension validation (`.py`, `.js`, `.ts`, `.java`)
 - **Language detection fallback** for paste mode when language is omitted.
 - **Python AST parser** extracts function metadata, signatures, decorators, and dependency hints.
+- **Python AST-based parser caching** uses canonical AST hashing (comment/format-insensitive, docstring-sensitive) to improve cache reuse without hiding metadata changes.
+- **Non-Python parser caching fallback** keeps existing raw-content hashing for JavaScript/TypeScript/Java until a robust local AST path is added.
 - **JavaScript/TypeScript parser** uses a fast LLM JSON schema parser for function metadata.
 - **Intent classifier** predicts test type, target scope, preferred framework, and confidence.
 - **Prompt chain** performs:
@@ -61,6 +63,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 - **Source upload support** persists original uploaded source file path/URL.
 - **Per-job run stats** recorded in `test_run_results`.
 - **Rerun support** regenerates tests from saved code snapshot and prior intent context.
+- **Human-in-the-loop feedback** stores thumbs up/down plus optional correction and reviewer notes in `generation_job_feedback` for future dataset export.
 
 ### Reliability and Guardrails
 
@@ -119,7 +122,8 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 │       ├── 002_phase_4_ci_git.sql
 │       ├── 003_session_isolation.sql
 │       ├── 004_storage_and_contract_alignment.sql
-│       └── 005_source_upload_artifacts.sql
+│       ├── 005_source_upload_artifacts.sql
+│       └── 006_hitl_feedback_and_parser_cache_ready.sql
 ├── frontend/
 │   ├── src/
 │   │   ├── app/                       # Routing and providers
@@ -194,6 +198,8 @@ When enabled, generated artifact files are committed (and optionally pushed). Pa
 - `GET /jobs/{job_id}` returns full details plus latest run stats
 - `GET /jobs/{job_id}/status` returns lightweight status polling view
 - `POST /jobs/{job_id}/rerun` replays generation from stored code snapshot
+- `POST /jobs/{job_id}/feedback` upserts one session-scoped feedback record (thumbs up/down + optional notes)
+- `GET /jobs/{job_id}/feedback` returns the current session-scoped feedback record (or null when not yet reviewed)
 
 ## API Reference
 
@@ -206,6 +212,8 @@ When enabled, generated artifact files are committed (and optionally pushed). Pa
 | `GET` | `/jobs/{job_id}` | Fetch full job detail, artifacts, and latest run |
 | `POST` | `/jobs/{job_id}/rerun` | Regenerate tests from prior job snapshot |
 | `GET` | `/jobs/{job_id}/status` | Lightweight status endpoint |
+| `POST` | `/jobs/{job_id}/feedback` | Submit or update current session feedback for a job |
+| `GET` | `/jobs/{job_id}/feedback` | Retrieve current session feedback for a job |
 | `GET` | `/health` | API + DB health check |
 
 ### Required Header
@@ -278,7 +286,7 @@ LLM_TIMEOUT_SECONDS=25
 LLM_MAX_RETRIES=3
 
 # Caching
-USE_REDIS_CACHE=false
+USE_REDIS_CACHE=true
 REDIS_URL=redis://localhost:6379/0
 PARSER_CACHE_TTL_SECONDS=600
 INTENT_CACHE_TTL_SECONDS=600
