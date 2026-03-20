@@ -1,0 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-color: #4f7cff #10182d;
+}
+
+body {
+  @apply min-h-screen bg-ink-950 text-slate-100 antialiased;
+  background-image:
+    radial-gradient(circle at 15% -10%, rgba(27, 197, 255, 0.17), transparent 35%),
+    radial-gradient(circle at 90% 0%, rgba(212, 76, 255, 0.12), transparent 38%),
+    linear-gradient(180deg, #070a14 0%, #0b1020 40%, #0a1120 100%);
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+.glass-card {
+  @apply rounded-xl2 border border-white/10 bg-ink-850/70 shadow-soft backdrop-blur;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900;
+}
