@@ -60,6 +60,9 @@ class Settings(BaseModel):
 	llm_strong_model: str = Field(default=os.getenv("LLM_STRONG_MODEL", "gpt-4.1"))
 	llm_timeout_seconds: int = Field(default=int(os.getenv("LLM_TIMEOUT_SECONDS", "25")))
 	llm_max_retries: int = Field(default=int(os.getenv("LLM_MAX_RETRIES", "3")))
+	llm_enable_self_eval: bool = Field(default=os.getenv("LLM_ENABLE_SELF_EVAL", "false").lower() == "true")
+	llm_gen_timeout_seconds: int = Field(default=int(os.getenv("LLM_GEN_TIMEOUT_SECONDS", "20")))
+	llm_gen_max_retries: int = Field(default=int(os.getenv("LLM_GEN_MAX_RETRIES", "1")))
 
 	auto_commit_default: bool = Field(default=os.getenv("AUTO_COMMIT_DEFAULT", "false").lower() == "true")
 	git_author_name: str = Field(default=os.getenv("GIT_AUTHOR_NAME", "ai-test-gen-bot"))

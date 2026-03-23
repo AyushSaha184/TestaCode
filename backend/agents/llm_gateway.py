@@ -76,11 +76,20 @@ class LLMGateway:
     def _model(self, tier: ModelTier):
         return self._fast if tier == "fast" else self._strong
 
-    def invoke_text(self, system_prompt: str, user_prompt: str, tier: ModelTier) -> str:
+    def invoke_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tier: ModelTier,
+        timeout_override: int | None = None,
+        max_retries_override: int | None = None,
+    ) -> str:
         model = self._model(tier)
         model_name = self.settings.llm_fast_model if tier == "fast" else self.settings.llm_strong_model
+        effective_timeout = timeout_override if timeout_override is not None else self.settings.llm_timeout_seconds
+        effective_retries = max_retries_override if max_retries_override is not None else self.settings.llm_max_retries
 
-        for attempt in range(1, self.settings.llm_max_retries + 1):
+        for attempt in range(1, effective_retries + 1):
             logger.info(
                 "llm_call_started",
                 extra={"step": "llm_call", "attempt": attempt, "model": model_name},
@@ -95,7 +104,7 @@ class LLMGateway:
                         model.invoke,
                         [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)],
                     )
-                    response = future.result(timeout=self.settings.llm_timeout_seconds)
+                    response = future.result(timeout=effective_timeout)
 
                 text = getattr(response, "content", "")
                 if isinstance(text, list):
@@ -117,13 +126,23 @@ class LLMGateway:
                     extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "error"},
                 )
 
-            if attempt < self.settings.llm_max_retries:
+            if attempt < effective_retries:
                 time.sleep(min(2 ** (attempt - 1), 6))
 
         raise RuntimeError("LLM invocation failed after retries")
 
-    def invoke_json(self, system_prompt: str, user_prompt: str, tier: ModelTier) -> dict[str, Any]:
-        text = self.invoke_text(system_prompt, user_prompt, tier=tier)
+    def invoke_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tier: ModelTier,
+        timeout_override: int | None = None,
+        max_retries_override: int | None = None,
+    ) -> dict[str, Any]:
+        text = self.invoke_text(
+            system_prompt, user_prompt, tier=tier,
+            timeout_override=timeout_override, max_retries_override=max_retries_override,
+        )
         text = text.strip()
         if text.startswith("```"):
             lines = [line for line in text.splitlines() if not line.startswith("```")]

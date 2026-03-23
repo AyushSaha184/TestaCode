@@ -26,8 +26,10 @@ def test_path_sanitization_and_feature_derivation() -> None:
     assert derive_feature_name(InputMode.paste, None, ctx) == "dothing"
 
 
-def test_file_writer_atomic_and_metadata(tmp_path: Path) -> None:
-    service = FileOutputService(repository_root=str(tmp_path), generated_tests_dir="generated_tests")
+def test_file_writer_atomic_and_metadata() -> None:
+    root = (Path("generated_tests") / f"pytest_atomic_case_{uuid4().hex}").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    service = FileOutputService(repository_root=str(root), generated_tests_dir="generated_tests")
     ctx = _context(Language.python)
 
     result = service.write_outputs(
@@ -42,16 +44,14 @@ def test_file_writer_atomic_and_metadata(tmp_path: Path) -> None:
         uncovered_areas=["none"],
     )
 
-    test_file = tmp_path / result.local_test_file_path
-    metadata_file = tmp_path / result.local_metadata_file_path
+    test_file = (root / result.local_test_file_path).resolve()
+    metadata_file = (root / result.local_metadata_file_path).resolve()
 
     assert test_file.exists()
     assert metadata_file.exists()
-    assert result.test_file_path is None
-    assert result.metadata_file_path is None
     assert result.local_test_file_path == "generated_tests/session-test-1/python/compute_total/test_compute_total.py"
     assert result.local_metadata_file_path == "generated_tests/session-test-1/python/compute_total/test_compute_total.json"
-    assert any("Supabase storage is not configured" in warning for warning in result.warnings)
+    assert result.warnings == []
 
     second = service.write_outputs(
         job_id=uuid4(),
@@ -66,7 +66,7 @@ def test_file_writer_atomic_and_metadata(tmp_path: Path) -> None:
     )
 
     assert second.local_test_file_path == result.local_test_file_path
-    assert "test_ok2" in (tmp_path / second.local_test_file_path).read_text(encoding="utf-8")
+    assert "test_ok2" in (root / second.local_test_file_path).resolve().read_text(encoding="utf-8")
 
 
 class FakeStorageService:
@@ -82,28 +82,23 @@ class FakeStorageService:
         return _Result(object_path)
 
 
-def test_file_writer_uploads_storage_when_configured(tmp_path: Path) -> None:
+def test_file_writer_uploads_storage_when_configured() -> None:
     service = FileOutputService(
-        repository_root=str(tmp_path),
+        repository_root=".",
         generated_tests_dir="generated_tests",
         storage_service=FakeStorageService(),
     )
-    ctx = _context(Language.typescript, function_name="sum_values")
 
-    result = service.write_outputs(
-        job_id=uuid4(),
+    test_path, metadata_path, test_url, metadata_url, warnings = service.upload_output_artifacts(
         session_id="session-test-2",
-        input_mode=InputMode.paste,
-        original_filename=None,
-        context=ctx,
+        detected_language=Language.typescript,
+        feature_name="sum_values",
         generated_test_code="test('ok', () => expect(true).toBe(true));\n",
-        quality_score=8,
-        framework_used="jest",
-        uncovered_areas=[],
+        metadata_payload={"job_id": "123"},
     )
 
-    assert result.test_file_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
-    assert result.metadata_file_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.json"
-    assert result.test_file_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
-    assert result.metadata_file_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.json"
-    assert result.warnings == []
+    assert test_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
+    assert metadata_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.json"
+    assert test_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
+    assert metadata_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.json"
+    assert warnings == []

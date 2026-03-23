@@ -47,6 +47,7 @@ class InputProcessingService:
 			prompt=request.user_prompt,
 			language=request.language,
 			code=request.code_content,
+			function_metadata=function_metadata,
 		)
 
 		warnings = [*base_warnings, *intent_warnings]

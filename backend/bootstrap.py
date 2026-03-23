@@ -91,10 +91,10 @@ def get_orchestrator() -> GenerationOrchestrator:
             logger.exception("redis_cache_init_failed", extra={"step": "cache", "status": "fallback"})
 
     parser_service = ParserService(ttl_seconds=settings.parser_cache_ttl_seconds, cache=parser_cache)
-    js_ts_parser = JavaScriptTypeScriptParser(llm)
+    js_ts_parser = JavaScriptTypeScriptParser()
     intent_classifier = PromptIntentClassifier(llm, ttl_seconds=settings.intent_cache_ttl_seconds, cache=intent_cache)
     input_service = InputProcessingService(parser_service, js_ts_parser, intent_classifier)
-    chain = TestGenerationChain(llm)
+    chain = TestGenerationChain(llm, settings)
     repository = get_repository()
     storage_service = get_storage_service()
     file_output_service = FileOutputService(
