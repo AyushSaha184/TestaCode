@@ -14,6 +14,9 @@ function toMonacoLang(language: Language): string {
   if (language === "python") return "python";
   if (language === "javascript") return "javascript";
   if (language === "typescript") return "typescript";
+  if (language === "rust") return "rust";
+  if (language === "golang") return "go";
+  if (language === "csharp") return "csharp";
   return "java";
 }
 

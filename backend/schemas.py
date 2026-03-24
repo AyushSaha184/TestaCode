@@ -18,6 +18,9 @@ class Language(str, Enum):
 	javascript = "javascript"
 	typescript = "typescript"
 	java = "java"
+	rust = "rust"
+	golang = "golang"
+	csharp = "csharp"
 
 
 class JobStatus(str, Enum):
@@ -96,6 +99,7 @@ class GenerationResponse(BaseModel):
 	model_config = ConfigDict(extra="forbid", strict=True)
 
 	job_id: UUID
+	detected_language: Language
 	generated_test_code: str
 	quality_score: int
 	uncovered_areas: list[str] = Field(default_factory=list)

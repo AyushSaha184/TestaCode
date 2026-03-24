@@ -22,6 +22,9 @@ _EXTENSION_MAP: dict[Language, str] = {
     Language.javascript: "js",
     Language.typescript: "ts",
     Language.java: "java",
+    Language.rust: "rs",
+    Language.golang: "go",
+    Language.csharp: "cs",
 }
 
 

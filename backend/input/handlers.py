@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from backend.core.exceptions import AppError
 from backend.core.logger import get_logger
 from backend.input.intent_classifier import PromptIntentClassifier
 from backend.input.js_parser import JavaScriptTypeScriptParser
@@ -31,10 +30,8 @@ class InputProcessingService:
 			parsed = self.parser_service.python_parser.parse(code)
 		elif language in (Language.javascript, Language.typescript):
 			parsed = self.js_ts_parser.parse(language, code)
-		elif language == Language.java:
+		elif language in (Language.java, Language.rust, Language.golang, Language.csharp):
 			parsed = []
-		else:
-			raise AppError(f"Unsupported language '{language.value}'", status_code=422)
 
 		self.parser_service.set_cached(session_id, language, code, parsed)
 		return parsed

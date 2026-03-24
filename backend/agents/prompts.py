@@ -95,40 +95,24 @@ def build_analysis_summary(context: UnifiedContext) -> str:
 	)
 
 
-# ── Keep for backward compat; no longer called on critical path ──
-
-def build_analysis_prompts(context: UnifiedContext) -> tuple[str, str]:
-	"""Deprecated: analysis is now inlined into the generation prompt."""
-	system_prompt = (
-		"You are a senior test architect. Produce behavior-oriented analysis before writing tests."
-	)
-	user_prompt = (
-		"Analyze code under test and return concise markdown with sections:\n"
-		"1) Expected valid behavior\n"
-		"2) Invalid input behavior\n"
-		"3) Dependency and mock strategy\n"
-		"4) High-priority scenarios\n"
-		f"Language: {context.detected_language.value}\n"
-		f"Prompt intent: {context.classified_intent.model_dump_json()}\n"
-		f"Function metadata:\n{_compact_function_summary(context)}\n"
-		f"Code:\n{_relevant_code_excerpt(context)}"
-	)
-	return system_prompt, user_prompt
-
-
 def build_generation_prompts(context: UnifiedContext) -> tuple[str, str]:
 	"""Single combined analysis+generation prompt. Replaces the old two-call approach."""
-	mock_instruction = (
-		"Use patch and MagicMock for Python dependency mocking when needed."
-		if context.detected_language.value == "python"
-		else "Use jest.mock for JavaScript/TypeScript dependency mocking when needed."
-	)
+	mock_instructions = {
+		"python": "Use patch and MagicMock for Python dependency mocking when needed.",
+		"javascript": "Use jest.mock for JavaScript/TypeScript dependency mocking when needed.",
+		"typescript": "Use jest.mock for JavaScript/TypeScript dependency mocking when needed.",
+		"java": "Use JUnit-style tests and mock external collaborators with Mockito when needed.",
+		"rust": "Use cargo test conventions; prefer inline test modules and lightweight stubs over heavy mocking.",
+		"golang": "Use go test conventions; isolate dependencies with interfaces or small fakes when needed.",
+		"csharp": "Use xUnit conventions and mock external dependencies with Moq-style substitutes when needed.",
+	}
+	mock_instruction = mock_instructions.get(context.detected_language.value, "Mock external dependencies only when needed.")
 	generation_instruction = select_generation_instruction(context.classified_intent)
 
 	system_prompt = (
 		"You are an expert test generator. "
 		"First, briefly analyze the code to identify: valid behavior, error paths, dependency/mock strategy, and high-priority scenarios. "
-		"Then produce production-ready test code only. Do not output analysis text — only test code."
+		"Then produce production-ready test code only. Do not output analysis text - only test code."
 	)
 
 	user_prompt = (

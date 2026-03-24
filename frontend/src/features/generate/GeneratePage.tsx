@@ -14,6 +14,9 @@ const LANGUAGE_OPTIONS: Array<{ label: string; value: Language }> = [
   { label: "JavaScript", value: "javascript" },
   { label: "TypeScript", value: "typescript" },
   { label: "Java", value: "java" },
+  { label: "Rust", value: "rust" },
+  { label: "Go", value: "golang" },
+  { label: "C#", value: "csharp" },
 ];
 
 function detectLanguageFromCode(source: string): Language {
@@ -21,6 +24,32 @@ function detectLanguageFromCode(source: string): Language {
   if (!code) return "python";
 
   const checks: Array<{ language: Language; patterns: RegExp[] }> = [
+    {
+      language: "rust",
+      patterns: [/\bfn\s+\w+\s*\(/, /\blet\s+mut\b/, /\bimpl\s+\w+/, /\bpub\s+struct\s+\w+/, /\bprintln!\s*\(/, /\buse\s+std::/],
+    },
+    {
+      language: "golang",
+      patterns: [
+        /^\s*package\s+main\b/m,
+        /\bfunc\s+\w+\s*\(/,
+        /\bfmt\.Println\s*\(/,
+        /:=/,
+        /^\s*import\s+\(/m,
+        /\btype\s+\w+\s+struct\b/,
+      ],
+    },
+    {
+      language: "csharp",
+      patterns: [
+        /^\s*using\s+System\s*;/m,
+        /^\s*namespace\s+[\w.]+\s*[{;]/m,
+        /\bpublic\s+class\s+\w+/,
+        /\bConsole\.WriteLine\s*\(/,
+        /\bstring\[\]\s+args\b/,
+        /\[(Test|Fact)\]/,
+      ],
+    },
     {
       language: "python",
       patterns: [
@@ -100,7 +129,6 @@ export function GeneratePage() {
     () => (languageMode === "auto" ? autoDetectedLanguage : languageMode),
     [autoDetectedLanguage, languageMode],
   );
-  const generatedCodeLanguage = useMemo(() => effectiveLanguage, [effectiveLanguage]);
   const inputMode: InputMode = uploadFile ? "upload" : "paste";
 
   useEffect(() => {
@@ -141,6 +169,7 @@ export function GeneratePage() {
   };
 
   const response = generateMutation.data;
+  const generatedCodeLanguage = response?.detected_language ?? effectiveLanguage;
 
   return (
     <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.98fr)_minmax(360px,1.02fr)]">

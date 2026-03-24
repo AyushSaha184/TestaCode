@@ -74,9 +74,6 @@ class Settings(BaseModel):
 	def resolved_repository_root(self) -> str:
 		return str(Path(self.repository_root).resolve())
 
-	def resolved_generated_tests_dir(self) -> str:
-		return str((Path(self.resolved_repository_root()) / self.generated_tests_dir).resolve())
-
 	def validate_production_configuration(self) -> None:
 		if self.app_env.lower() != "production":
 			return

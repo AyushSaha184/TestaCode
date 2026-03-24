@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from backend.app import app
 from backend.bootstrap import get_orchestrator
-from backend.schemas import GenerationRequest, GenerationResponse, JobStatus, JobStatusView, RerunResult
+from backend.schemas import GenerationRequest, GenerationResponse, JobStatus, JobStatusView, Language, RerunResult
 
 
 class FakeOrchestrator:
@@ -15,6 +15,7 @@ class FakeOrchestrator:
         assert request.session_id
         return GenerationResponse(
             job_id=uuid4(),
+            detected_language=Language.python,
             generated_test_code="def test_ok():\n    assert True",
             quality_score=8,
             uncovered_areas=["null input"],
@@ -73,6 +74,7 @@ def test_generate_endpoint_form_contract() -> None:
     payload = response.json()
     assert payload["framework_used"] == "pytest"
     assert payload["quality_score"] == 8
+    assert payload["detected_language"] == "python"
     assert payload["source_file_path"] == "uploads/session-test-1/python/add.py"
     assert payload["source_file_url"] == "https://storage.local/add.py"
     assert payload["output_test_path"] == "generated_tests/python/add/test_add.py"

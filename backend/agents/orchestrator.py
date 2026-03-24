@@ -71,6 +71,7 @@ class GenerationOrchestrator:
 					)
 					return GenerationResponse(
 						job_id=existing.id,
+						detected_language=existing.detected_language,
 						generated_test_code=existing.generated_test_code,
 						quality_score=existing.quality_score,
 						uncovered_areas=existing.uncovered_areas,
@@ -233,6 +234,7 @@ class GenerationOrchestrator:
 
 			return GenerationResponse(
 				job_id=job_id,
+				detected_language=context.detected_language,
 				generated_test_code=generated_code,
 				quality_score=quality_score,
 				uncovered_areas=uncovered_areas,
@@ -447,6 +449,12 @@ def _resolve_framework(requested: str, language: str) -> str:
 		return "jest"
 	if language == "java":
 		return "junit"
+	if language == "rust":
+		return "cargo test"
+	if language == "golang":
+		return "go test"
+	if language == "csharp":
+		return "xunit"
 	return "unspecified"
 
 

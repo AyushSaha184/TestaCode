@@ -13,6 +13,9 @@ _EXTENSION_MAP: dict[str, Language] = {
     ".js": Language.javascript,
     ".ts": Language.typescript,
     ".java": Language.java,
+    ".rs": Language.rust,
+    ".go": Language.golang,
+    ".cs": Language.csharp,
 }
 
 
@@ -20,6 +23,44 @@ def _detect_language_from_code(code_content: str) -> Language:
     source = code_content.strip()
     if not source:
         return Language.python
+
+    checks: list[tuple[Language, tuple[str, ...]]] = [
+        (
+            Language.rust,
+            ("fn ", "let mut ", "impl ", "pub struct ", "println!", "use std::"),
+        ),
+        (
+            Language.golang,
+            ("package main", "func ", "fmt.Println", ":=", "import (", " struct"),
+        ),
+        (
+            Language.csharp,
+            ("using System", "namespace ", "public class ", "Console.WriteLine", "string[] args", "[Test]", "[Fact]"),
+        ),
+        (
+            Language.java,
+            ("public class", "System.out.println", "package "),
+        ),
+        (
+            Language.typescript,
+            ("interface ", "type ", ": string", ": number", "implements ", "readonly "),
+        ),
+        (
+            Language.javascript,
+            ("function ", "const ", "let ", "=>", "console.log"),
+        ),
+    ]
+
+    best_language = Language.python
+    best_score = 0
+    for candidate, patterns in checks:
+        score = sum(1 for pattern in patterns if pattern in source)
+        if score > best_score:
+            best_language = candidate
+            best_score = score
+
+    if best_score > 0:
+        return best_language
 
     if "public class" in source or "System.out.println" in source or "package " in source:
         return Language.java
@@ -91,16 +132,24 @@ async def normalize_generation_request(
         if language and language != detected_language.value:
             warnings.append("Provided language differs from extension; extension-derived language was used")
     else:
-        if not code_content or not code_content.strip():
-            raise AppError("code_content is required when input_mode=paste", status_code=422)
+        normalized_code = (code_content or "").strip()
+        prompt_only = not normalized_code and bool(user_prompt.strip())
+
         if language:
             try:
                 detected_language = Language(language)
             except ValueError as exc:
-                raise AppError("language must be one of: python, javascript, typescript, java", status_code=422) from exc
+                raise AppError(
+                    "language must be one of: python, javascript, typescript, java, rust, golang, csharp",
+                    status_code=422,
+                ) from exc
+        elif prompt_only:
+            detected_language = Language.python
         else:
-            detected_language = _detect_language_from_code(code_content)
-        normalized_code = code_content
+            if not normalized_code:
+                raise AppError("code_content is required when input_mode=paste", status_code=422)
+            detected_language = _detect_language_from_code(normalized_code)
+        normalized_code = code_content or ""
 
     request = GenerationRequest(
         session_id=session_id.strip(),

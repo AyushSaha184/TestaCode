@@ -1,10 +1,11 @@
 export type InputMode = "paste" | "upload";
-export type Language = "python" | "javascript" | "typescript" | "java";
+export type Language = "python" | "javascript" | "typescript" | "java" | "rust" | "golang" | "csharp";
 export type JobStatus = "queued" | "processing" | "completed" | "failed";
 export type FeedbackValue = "up" | "down";
 
 export interface GenerationResponse {
   job_id: string;
+  detected_language: Language;
   generated_test_code: string;
   quality_score: number;
   uncovered_areas: string[];

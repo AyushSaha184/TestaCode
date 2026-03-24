@@ -102,3 +102,24 @@ def test_file_writer_uploads_storage_when_configured() -> None:
     assert test_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
     assert metadata_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.json"
     assert warnings == []
+
+
+def test_file_writer_uses_new_language_extension() -> None:
+    root = (Path("generated_tests") / f"pytest_rust_case_{uuid4().hex}").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    service = FileOutputService(repository_root=str(root), generated_tests_dir="generated_tests")
+    ctx = _context(Language.rust, function_name="compute_total")
+
+    result = service.write_outputs(
+        job_id=uuid4(),
+        session_id="session-test-3",
+        input_mode=InputMode.paste,
+        original_filename=None,
+        context=ctx,
+        generated_test_code="#[test]\nfn compute_total_works() { assert!(true); }\n",
+        quality_score=8,
+        framework_used="cargo test",
+        uncovered_areas=[],
+    )
+
+    assert result.local_test_file_path == "generated_tests/session-test-3/rust/compute_total/test_compute_total.rs"
