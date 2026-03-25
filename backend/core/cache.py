@@ -5,7 +5,7 @@ import threading
 import time
 from typing import Generic, Protocol, TypeVar
 
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 
 logger = get_logger(__name__)
 

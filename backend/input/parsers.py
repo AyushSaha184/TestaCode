@@ -5,7 +5,7 @@ import hashlib
 from typing import Iterable
 
 from backend.core.cache import CacheBackend, TTLCache
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.schemas import FunctionMetadata, Language, ParameterMetadata
 
 logger = get_logger(__name__)

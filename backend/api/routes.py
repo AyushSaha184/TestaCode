@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 from backend.agents.orchestrator import GenerationOrchestrator
 from backend.bootstrap import get_orchestrator, get_repository, get_storage_service
 from backend.core.exceptions import AppError
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.core.config import get_settings
 from backend.input.normalizer import normalize_generation_request
 from backend.repositories.generation_repository import GenerationRepository

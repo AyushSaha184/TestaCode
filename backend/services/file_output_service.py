@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.schemas import InputMode, Language, UnifiedContext
 from backend.services.supabase_storage_service import SupabaseStorageService
 

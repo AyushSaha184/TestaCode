@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 
 logger = get_logger(__name__)
 

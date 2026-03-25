@@ -8,7 +8,7 @@ from backend.agents.orchestrator import GenerationOrchestrator
 from backend.core.cache import RedisTTLCache, TTLCache
 from backend.core.config import Settings, get_settings
 from backend.core.database import DatabaseClient
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.input.handlers import InputProcessingService
 from backend.input.intent_classifier import PromptIntentClassifier
 from backend.input.js_parser import JavaScriptTypeScriptParser

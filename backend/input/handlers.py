@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.input.intent_classifier import PromptIntentClassifier
 from backend.input.js_parser import JavaScriptTypeScriptParser
 from backend.input.parsers import ParserService

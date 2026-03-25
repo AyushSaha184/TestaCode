@@ -11,7 +11,7 @@ from backend.agents.chains import TestGenerationChain
 from backend.agents.prompts import build_analysis_summary
 from backend.core.cache import CacheBackend, TTLCache
 from backend.core.exceptions import AppError
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.input.handlers import InputProcessingService
 from backend.repositories.generation_repository import GenerationRepository
 from backend.services.file_output_service import FileOutputResult, FileOutputService

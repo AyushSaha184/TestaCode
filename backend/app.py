@@ -7,7 +7,7 @@ from backend.api.routes import router
 from backend.bootstrap import get_repository
 from backend.core.config import get_settings
 from backend.core.exceptions import install_exception_handlers
-from backend.core.logger import configure_logging, get_logger
+from backend.util.logger import configure_logging, get_logger
 from backend.core.middleware import RequestContextMiddleware
 
 

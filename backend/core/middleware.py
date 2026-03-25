@@ -7,7 +7,7 @@ from collections.abc import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 
 logger = get_logger(__name__)
 

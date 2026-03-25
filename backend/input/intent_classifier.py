@@ -4,7 +4,7 @@ import hashlib
 
 from backend.agents.llm_gateway import LLMGateway
 from backend.core.cache import CacheBackend, TTLCache
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.schemas import FunctionMetadata, IntentClassification, Language
 
 logger = get_logger(__name__)

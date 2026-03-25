@@ -8,7 +8,7 @@ from backend.agents.prompts import (
 )
 from backend.agents.tools import validate_generated_code
 from backend.core.config import Settings
-from backend.core.logger import get_logger
+from backend.util.logger import get_logger
 from backend.schemas import UnifiedContext
 
 logger = get_logger(__name__)
