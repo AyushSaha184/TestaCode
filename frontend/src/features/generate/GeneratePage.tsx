@@ -19,9 +19,9 @@ const LANGUAGE_OPTIONS: Array<{ label: string; value: Language }> = [
   { label: "C#", value: "csharp" },
 ];
 
-function detectLanguageFromCode(source: string): Language {
+function detectLanguageFromCode(source: string): Language | null {
   const code = source.trim();
-  if (!code) return "python";
+  if (!code) return null;
 
   const checks: Array<{ language: Language; patterns: RegExp[] }> = [
     {
@@ -108,7 +108,7 @@ function detectLanguageFromCode(source: string): Language {
     .sort((left, right) => right.score - left.score)[0];
 
   if (!bestMatch || bestMatch.score === 0) {
-    return "python";
+    return null;
   }
 
   return bestMatch.language;
@@ -117,7 +117,7 @@ function detectLanguageFromCode(source: string): Language {
 export function GeneratePage() {
   const [userPrompt, setUserPrompt] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE);
-  const [autoDetectedLanguage, setAutoDetectedLanguage] = useState<Language>(detectLanguageFromCode(DEFAULT_CODE));
+  const [autoDetectedLanguage, setAutoDetectedLanguage] = useState<Language | null>(detectLanguageFromCode(DEFAULT_CODE));
   const [languageMode, setLanguageMode] = useState<"auto" | Language>("auto");
   const [filename, setFilename] = useState("");
   const [uploadFile, setUploadFile] = useState<File | undefined>();
@@ -126,7 +126,7 @@ export function GeneratePage() {
   const generateMutation = useGenerateMutation();
 
   const effectiveLanguage = useMemo(
-    () => (languageMode === "auto" ? autoDetectedLanguage : languageMode),
+    () => (languageMode === "auto" ? autoDetectedLanguage ?? "python" : languageMode),
     [autoDetectedLanguage, languageMode],
   );
   const inputMode: InputMode = uploadFile ? "upload" : "paste";
@@ -136,7 +136,7 @@ export function GeneratePage() {
       setUserPrompt("");
       setUploadFile(undefined);
       setCode("");
-      setAutoDetectedLanguage("python");
+      setAutoDetectedLanguage(null);
       setLanguageMode("auto");
       setFilename("");
       setFileInputKey((previous) => previous + 1);
@@ -170,6 +170,7 @@ export function GeneratePage() {
 
   const response = generateMutation.data;
   const generatedCodeLanguage = response?.detected_language ?? effectiveLanguage;
+  const editorLanguageLabel = languageMode === "auto" ? (autoDetectedLanguage ?? "") : effectiveLanguage;
 
   return (
     <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.98fr)_minmax(360px,1.02fr)]">
@@ -194,10 +195,7 @@ export function GeneratePage() {
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-2">
                 <span>
-                  Editor language: <span className="font-semibold text-white">{effectiveLanguage}</span>
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                  {languageMode === "auto" ? "Auto Detected" : "Manual"}
+                  Editor language: <span className="font-semibold text-white">{editorLanguageLabel}</span>
                 </span>
               </div>
               <label className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-400">

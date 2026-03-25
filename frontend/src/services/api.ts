@@ -26,6 +26,7 @@ export async function generateTests(payload: GeneratePayload): Promise<Generatio
 
   const { data } = await apiClient.post<GenerationResponse>("/generate", formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 0,
   });
   return data;
 }
