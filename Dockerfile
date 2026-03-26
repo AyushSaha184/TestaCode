@@ -32,7 +32,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY backend ./backend
 COPY database ./database
-COPY src ./src
 COPY .env.example ./.env.example
 
 RUN mkdir -p /app/logs /app/generated_tests
