@@ -9,6 +9,16 @@ from uuid import uuid4
 import pytest
 
 
+collect_ignore_glob = [
+    ".pytest_cache/*",
+    ".pytest_tmp/*",
+    ".pytest_tmp_runtime/*",
+    "generated_tests/*",
+    "logs/*",
+    "tmp*",
+]
+
+
 ROOT = Path(__file__).resolve().parent.parent
 root_str = str(ROOT)
 if root_str not in sys.path:
