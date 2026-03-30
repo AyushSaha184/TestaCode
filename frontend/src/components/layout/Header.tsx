@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, Eraser, Menu } from "lucide-react";
+import { useIsMutating } from "@tanstack/react-query";
 import { useUiStore } from "@/store/uiStore";
 
 interface HeaderProps {
@@ -11,9 +12,14 @@ const CLEAR_FORM_EVENT = "testacode:clear-generate-form";
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { toggleSidebar } = useUiStore();
+  const activeGenerateMutations = useIsMutating({ mutationKey: ["generate-tests"] });
+  const isGenerating = activeGenerateMutations > 0;
   const [reportOpen, setReportOpen] = useState(false);
 
   const onClear = () => {
+    if (isGenerating) {
+      return;
+    }
     window.dispatchEvent(new CustomEvent(CLEAR_FORM_EVENT));
   };
 
@@ -37,6 +43,9 @@ export function Header({ title, subtitle }: HeaderProps) {
           <button
             className="focus-ring inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
             onClick={onClear}
+            disabled={isGenerating}
+            aria-disabled={isGenerating}
+            title={isGenerating ? "Clear is disabled while tests are generating" : "Clear form inputs"}
           >
             <Eraser size={14} aria-hidden="true" />
             Clear

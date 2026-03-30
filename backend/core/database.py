@@ -6,7 +6,7 @@ from typing import Any
 class DatabaseClient:
 	def __init__(self, dsn: str) -> None:
 		if not dsn:
-			raise ValueError("SUPABASE_DB_URL is required")
+			raise ValueError("DATABASE_URL is required")
 		self.dsn = dsn
 
 	def fetchall(self, query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:

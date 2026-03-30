@@ -5,6 +5,7 @@ export function useGenerateMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["generate-tests"],
     mutationFn: generateTests,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });

@@ -26,7 +26,11 @@ class Settings(BaseModel):
 			if origin.strip()
 		]
 	)
-	database_url: str = Field(default=os.getenv("SUPABASE_DB_URL", ""))
+	database_url: str = Field(
+		default=os.getenv("DATABASE_URL")
+		or os.getenv("RENDER_POSTGRES_URL")
+		or os.getenv("SUPABASE_DB_URL", "")
+	)
 	supabase_url: str = Field(default=os.getenv("SUPABASE_URL", ""))
 	supabase_anon_key: str = Field(default=os.getenv("SUPABASE_ANON_KEY", ""))
 	supabase_service_role_key: str = Field(default=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
@@ -78,7 +82,7 @@ class Settings(BaseModel):
 		if self.app_env.lower() != "production":
 			return
 		if not self.database_url:
-			raise ValueError("SUPABASE_DB_URL is required in production")
+			raise ValueError("DATABASE_URL is required in production")
 		if self.supabase_service_role_key and not self.supabase_url:
 			raise ValueError("SUPABASE_URL is required when SUPABASE_SERVICE_ROLE_KEY is set")
 		if self.vercel_frontend_url and self.vercel_frontend_url not in self.cors_origins():

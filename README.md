@@ -4,11 +4,11 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 
 ### Architecture Diagram
 
-![Architecture Diagram]()
+![Architecture Diagram](https://i.postimg.cc/9F9dGFD8/Architecture.png)
 
 ### Data Flow Diagram
 
-![Data Flow Diagram]()
+![Data Flow Diagram](https://i.postimg.cc/G2sV0TLK/dataflow.png)
 
 
 ## Live Architecture Focus
@@ -272,7 +272,7 @@ cp .env.example .env
 ```bash
 # Core
 APP_ENV=development
-SUPABASE_DB_URL=postgresql://postgres:password@localhost:5432/postgres
+DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres
 ALLOWED_ORIGINS=http://localhost:5173
 
 # LLM
@@ -351,9 +351,9 @@ Note: the current `docker-compose.yml` references `Dockerfile.backend` and `Dock
 
 ## Troubleshooting
 
-### SUPABASE_DB_URL missing
+### DATABASE_URL missing
 
-`DatabaseClient` requires `SUPABASE_DB_URL` at runtime. Set it in `.env` before starting backend.
+`DatabaseClient` requires `DATABASE_URL` at runtime. Set it in `.env` before starting backend.
 
 ### 422 on /generate
 
