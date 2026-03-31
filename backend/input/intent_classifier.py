@@ -53,7 +53,7 @@ class PromptIntentClassifier:
 		context_summary = _compact_code_summary(code, function_metadata)
 		user_prompt = f"Language: {language.value}\nPrompt: {prompt}\n{context_summary}"
 		payload = self.llm.invoke_json(system_prompt, user_prompt, tier="fast")
-		intent = IntentClassification(**payload)
+		intent = IntentClassification.model_validate(payload, strict=False)
 		self.cache.set(cache_key, intent)
 
 		warnings: list[str] = []
@@ -83,7 +83,7 @@ class PromptIntentClassifier:
 		context_summary = _compact_code_summary(code, function_metadata)
 		user_prompt = f"Language: {language.value}\nPrompt: {prompt}\n{context_summary}"
 		payload = self.llm.invoke_json(system_prompt, user_prompt, tier="fast")
-		intent = IntentClassification(**payload)
+		intent = IntentClassification.model_validate(payload, strict=False)
 		self.cache.set(cache_key, intent)
 
 		warnings: list[str] = []

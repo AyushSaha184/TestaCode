@@ -106,15 +106,28 @@ class LLMGateway:
                     )
                     response = future.result(timeout=effective_timeout)
 
-                text = getattr(response, "content", "")
-                if isinstance(text, list):
-                    text = "\n".join(str(item) for item in text)
+                content = getattr(response, "content", "")
+                if isinstance(content, list):
+                    # Gemini 3 thinking models return a list of typed parts:
+                    # [{"type": "thinking", "thinking": "..."}, {"type": "text", "text": "..."}]
+                    # We must extract only "text" parts — str(item) on dicts produces
+                    # Python single-quoted strings which break JSON parsing.
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get("type") == "text":
+                                text_parts.append(item.get("text", ""))
+                        elif isinstance(item, str):
+                            text_parts.append(item)
+                    text = "\n".join(text_parts)
+                else:
+                    text = str(content)
 
                 logger.info(
                     "llm_call_completed",
                     extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "ok"},
                 )
-                return str(text)
+                return text
             except TimeoutError:
                 logger.warning(
                     "llm_call_timeout",
