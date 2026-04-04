@@ -7,11 +7,11 @@ interface StatusBadgeProps {
 }
 
 const toneClasses = {
-  success: "border-accent-green/40 bg-accent-green/10 text-accent-green",
-  warning: "border-accent-orange/40 bg-accent-orange/10 text-accent-orange",
-  danger: "border-accent-red/40 bg-accent-red/10 text-accent-red",
-  info: "border-accent-cyan/40 bg-accent-cyan/10 text-accent-cyan",
-  neutral: "border-slate-500/40 bg-slate-500/10 text-slate-300",
+  success: "border-accent-green/45 bg-accent-green/12 text-accent-green",
+  warning: "border-accent-orange/45 bg-accent-orange/12 text-accent-orange",
+  danger: "border-accent-red/45 bg-accent-red/12 text-accent-red",
+  info: "border-accent-blue/45 bg-accent-blue/12 text-accent-blue",
+  neutral: "border-white/20 bg-white/5 text-slate-300",
 };
 
 const toneIcon = {
@@ -27,7 +27,7 @@ export function StatusBadge({ value }: StatusBadgeProps) {
   const Icon = toneIcon[tone];
 
   return (
-    <span className={clsx("inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold", toneClasses[tone])}>
+    <span className={clsx("inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-semibold", toneClasses[tone])}>
       <Icon size={12} aria-hidden="true" />
       <span>{value ?? "unknown"}</span>
     </span>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, Eraser, Menu } from "lucide-react";
 import { useIsMutating } from "@tanstack/react-query";
 import { useUiStore } from "@/store/uiStore";
+import { Bug } from "lucide-react";
 
 interface HeaderProps {
   title: string;
@@ -27,21 +28,21 @@ export function Header({ title, subtitle }: HeaderProps) {
     "mailto:ayushsaha184@gmail.com?subject=TestaCode%20Bug%20Report&body=Please%20describe%20the%20bug%20and%20attach%20screenshots.";
 
   return (
-    <header className="sticky top-0 z-20 mb-4 border-b border-white/10 bg-ink-950/80 px-3 py-3 backdrop-blur md:px-4">
+    <header className="sticky top-0 z-20 mb-4 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(6,9,16,0.9)] px-3 py-3 backdrop-blur-[20px] md:px-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button className="focus-ring rounded-lg border border-white/10 p-2 lg:hidden" onClick={toggleSidebar}>
             <Menu size={16} aria-hidden="true" />
           </button>
           <div>
-            <h2 className="text-lg font-semibold text-white md:text-xl">{title}</h2>
-            <p className="text-xs text-slate-400 md:text-sm">{subtitle}</p>
+            <h2 className="text-base font-semibold text-white">{title}</h2>
+            <p className="text-xs text-slate-400">{subtitle}</p>
           </div>
         </div>
 
         <div className="relative flex flex-1 items-center justify-end gap-2 md:max-w-3xl">
           <button
-            className="focus-ring inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
+            className="btn-ghost"
             onClick={onClear}
             disabled={isGenerating}
             aria-disabled={isGenerating}
@@ -52,21 +53,22 @@ export function Header({ title, subtitle }: HeaderProps) {
           </button>
 
           <button
-            className="focus-ring inline-flex items-center gap-1 rounded-lg border border-[#7a4fff]/45 bg-gradient-to-r from-[#2f1f57]/80 to-[#1f1440]/85 px-3 py-2 text-sm font-medium text-slate-100 shadow-[0_0_0_1px_rgba(122,79,255,0.15)] hover:border-[#9f77ff]/60"
+            className="btn-ghost"
             onClick={() => setReportOpen((prev) => !prev)}
             aria-expanded={reportOpen}
             aria-controls="report-bug-dropdown"
           >
+            <Bug size={14} />
             Report Bug
-            <ChevronDown size={14} aria-hidden="true" className={reportOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+            <ChevronDown size={14} aria-hidden="true" className={reportOpen ? "rotate-180 text-slate-200 transition-transform" : "text-slate-400 transition-transform"} />
           </button>
 
           {reportOpen ? (
             <div
               id="report-bug-dropdown"
-              className="absolute right-0 top-full z-30 mt-2 w-[320px] rounded-xl border border-[#7a4fff]/45 bg-gradient-to-r from-[#2f1f57]/95 to-[#1f1440]/95 px-3 py-2 text-sm text-slate-100 shadow-lg"
+              className="glass-card absolute right-0 top-full z-30 mt-2 w-[310px] p-3 text-sm text-slate-300"
             >
-              Please report the bug <a href={reportHref} className="underline">here</a> with screenshots.
+              Please report the bug <a href={reportHref} className="text-accent-cyan underline underline-offset-4">here</a> with screenshots.
             </div>
           ) : null}
         </div>

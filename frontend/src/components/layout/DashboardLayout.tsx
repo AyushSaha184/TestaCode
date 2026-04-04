@@ -11,9 +11,9 @@ export function DashboardLayout({ title, subtitle, children }: DashboardLayoutPr
   return (
     <div className="min-h-screen">
       <Sidebar isMobile />
-      <div className="lg:pl-72">
+      <div className="lg:pl-56">
         <Header title={title} subtitle={subtitle} />
-        <main className="px-3 pb-6 md:px-4">{children}</main>
+        <main className="px-3 pb-6 md:px-5">{children}</main>
       </div>
     </div>
   );

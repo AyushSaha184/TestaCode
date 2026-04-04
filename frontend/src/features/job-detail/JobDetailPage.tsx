@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { CodeViewer } from "@/components/common/CodeViewer";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -39,7 +40,7 @@ export function JobDetailPage() {
   if (detailQuery.isLoading) {
     return (
       <div className="grid gap-3">
-        <Skeleton className="h-24" />
+        <Skeleton className="h-36" />
         <Skeleton className="h-72" />
         <Skeleton className="h-72" />
       </div>
@@ -56,7 +57,7 @@ export function JobDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -65,7 +66,7 @@ export function JobDetailPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className="focus-ring rounded-lg border border-white/20 bg-ink-900/70 px-3 py-2 text-xs font-semibold text-slate-200"
+              className="btn-ghost"
               onClick={() => navigate("/generate")}
             >
               Back to output
@@ -73,7 +74,7 @@ export function JobDetailPage() {
             <StatusBadge value={statusQuery.data?.ci_status || detail.ci_status || detail.status} />
             <button
               disabled={rerunMutation.isPending}
-              className="focus-ring rounded-lg border border-accent-magenta/40 bg-accent-magenta/15 px-3 py-2 text-xs font-semibold text-accent-magenta"
+              className="focus-ring inline-flex items-center gap-2 rounded-xl border border-accent-magenta/45 bg-accent-magenta/14 px-3 py-2 text-xs font-semibold text-accent-magenta hover:bg-accent-magenta/20 disabled:opacity-60"
               onClick={async () => {
                 try {
                   const response = await rerunMutation.mutateAsync();
@@ -84,6 +85,7 @@ export function JobDetailPage() {
                 }
               }}
             >
+              <RefreshCcw size={13} className={rerunMutation.isPending ? "animate-spin" : ""} aria-hidden="true" />
               {rerunMutation.isPending ? "Rerunning..." : "Rerun"}
             </button>
           </div>
@@ -95,7 +97,6 @@ export function JobDetailPage() {
           <InfoItem label="Status" value={detail.status} />
           <InfoItem label="Framework" value={detail.framework_used || "-"} />
           <InfoItem label="Filename" value={detail.original_filename || "-"} />
-          <InfoItem label="Quality score" value={detail.quality_score?.toString() || "-"} />
           <InfoItem label="Commit SHA" value={detail.commit_sha || "-"} mono />
           <InfoItem label="Status updated" value={formatDate(detail.ci_updated_at)} />
         </div>
@@ -108,27 +109,59 @@ export function JobDetailPage() {
 
       <Card className="space-y-3">
         <h4 className="font-semibold text-white">Analysis</h4>
-        <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-ink-900/70 p-3 text-sm text-slate-200">
+        <pre className="whitespace-pre-wrap rounded-xl border border-white/10 bg-[#0b1324] p-3 text-sm text-slate-200">
           {detail.analysis_text || "No analysis text"}
         </pre>
       </Card>
 
       <Card className="space-y-3">
         <h4 className="font-semibold text-white">Generated Test Code</h4>
-        <div className="overflow-hidden rounded-lg border border-white/10">
+        <div className="overflow-hidden rounded-xl border border-white/10">
           <CodeViewer code={detail.generated_test_code || ""} language={detail.detected_language} />
         </div>
       </Card>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Card>
+          <h4 className="mb-2 font-semibold text-white">Warnings</h4>
+          <div className="flex flex-wrap gap-2">
+            {detail.warnings.length ? (
+              detail.warnings.map((item) => (
+                <span key={item} className="tag-red">
+                  {item}
+                </span>
+              ))
+            ) : (
+              <span className="text-sm text-slate-400">None</span>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <h4 className="mb-2 font-semibold text-white">Uncovered Areas</h4>
+          <div className="flex flex-wrap gap-2">
+            {detail.uncovered_areas.length ? (
+              detail.uncovered_areas.map((item) => (
+                <span key={item} className="tag-orange">
+                  {item}
+                </span>
+              ))
+            ) : (
+              <span className="text-sm text-slate-400">None</span>
+            )}
+          </div>
+        </Card>
+      </div>
 
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="font-semibold text-white">Human Feedback</h4>
           {feedbackQuery.data ? (
-            <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+            <span className="tag-green">
               Saved {formatDate(feedbackQuery.data.updated_at)}
             </span>
           ) : (
-            <span className="rounded-full border border-slate-400/30 bg-slate-500/10 px-2 py-1 text-xs text-slate-300">Not reviewed</span>
+            <span className="tag-neutral">Not reviewed</span>
           )}
         </div>
 
@@ -138,11 +171,14 @@ export function JobDetailPage() {
             onClick={() => setFeedbackValue("up")}
             className={`focus-ring rounded-lg border px-3 py-2 text-sm font-medium ${
               feedbackValue === "up"
-                ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200"
-                : "border-white/20 bg-ink-900/70 text-slate-200"
+                ? "border-accent-green/60 bg-accent-green/20 text-accent-green"
+                : "border-white/20 bg-[#0a1120] text-slate-200"
             }`}
           >
+            <span className="inline-flex items-center gap-2">
+              <ThumbsUp size={14} aria-hidden="true" />
             Thumbs up
+            </span>
           </button>
           <button
             type="button"
@@ -150,10 +186,13 @@ export function JobDetailPage() {
             className={`focus-ring rounded-lg border px-3 py-2 text-sm font-medium ${
               feedbackValue === "down"
                 ? "border-accent-red/60 bg-accent-red/20 text-accent-red"
-                : "border-white/20 bg-ink-900/70 text-slate-200"
+                : "border-white/20 bg-[#0a1120] text-slate-200"
             }`}
           >
+            <span className="inline-flex items-center gap-2">
+              <ThumbsDown size={14} aria-hidden="true" />
             Thumbs down
+            </span>
           </button>
         </div>
 
@@ -164,44 +203,12 @@ export function JobDetailPage() {
               value={correctionText}
               onChange={(event) => setCorrectionText(event.target.value)}
               rows={8}
-              className="focus-ring w-full rounded-lg border border-white/15 bg-ink-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+              className="input-base min-h-32"
               placeholder="Optional: suggest exact test improvements or missing cases"
             />
           </label>
         </div>
       </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <h4 className="mb-2 font-semibold text-white">Warnings</h4>
-          <div className="flex flex-wrap gap-2">
-            {detail.warnings.length ? (
-              detail.warnings.map((item) => (
-                <span key={item} className="rounded-full border border-accent-red/40 bg-accent-red/10 px-2 py-1 text-xs text-accent-red">
-                  {item}
-                </span>
-              ))
-            ) : (
-              <span className="text-sm text-slate-400">No warnings</span>
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <h4 className="mb-2 font-semibold text-white">Uncovered Areas</h4>
-          <div className="flex flex-wrap gap-2">
-            {detail.uncovered_areas.length ? (
-              detail.uncovered_areas.map((item) => (
-                <span key={item} className="rounded-full border border-accent-orange/40 bg-accent-orange/10 px-2 py-1 text-xs text-accent-orange">
-                  {item}
-                </span>
-              ))
-            ) : (
-              <span className="text-sm text-slate-400">No uncovered areas</span>
-            )}
-          </div>
-        </Card>
-      </div>
 
       <Card>
         <h4 className="mb-2 font-semibold text-white">Latest Run</h4>
@@ -222,11 +229,21 @@ export function JobDetailPage() {
   );
 }
 
-function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function InfoItem({
+  label,
+  value,
+  mono = false,
+  accent,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  accent?: "cyan";
+}) {
   return (
-    <div className="rounded-lg border border-white/10 bg-ink-900/70 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`mt-1 text-sm text-slate-100 ${mono ? "font-mono" : ""}`}>{value}</p>
+    <div className="rounded-xl border border-white/10 bg-[#0a1120] p-3">
+      <p className="section-label">{label}</p>
+      <p className={`mt-1 text-sm ${accent === "cyan" ? "text-accent-cyan" : "text-slate-100"} ${mono ? "font-code" : ""}`}>{value}</p>
     </div>
   );
 }
