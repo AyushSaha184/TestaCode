@@ -162,7 +162,7 @@ export function GeneratePage() {
         filename: filename || undefined,
         upload_file: uploadFile,
       });
-      toast.success(`Generated tests for job ${response.job_id}`);
+      toast.success("Generated tests successfully");
     } catch (error) {
       toast.error((error as Error).message || "Generation failed");
     }
@@ -261,7 +261,7 @@ export function GeneratePage() {
         {!response ? (
           <p className="text-sm text-slate-400">Generated tests, quality score, and warnings will appear here.</p>
         ) : (
-          <div className="min-h-0 space-y-3 xl:flex-1 xl:overflow-y-auto">
+          <div className="flex min-h-0 flex-col gap-3 xl:flex-1 xl:overflow-y-auto">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge value={response.ci_status || "completed"} />
               <span className="rounded-full border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-1 text-xs font-semibold text-accent-cyan">
@@ -271,9 +271,8 @@ export function GeneratePage() {
             </div>
 
             <div className="text-sm text-slate-300">
-              Job: <span className="font-mono text-slate-100">{response.job_id}</span>{" "}
               <Link to={`/jobs/${response.job_id}`} className="text-accent-cyan underline-offset-4 hover:underline">
-                View Details
+                View details
               </Link>
             </div>
 
@@ -313,8 +312,8 @@ export function GeneratePage() {
               ))}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-white/10">
-              <CodeViewer code={response.generated_test_code || ""} language={generatedCodeLanguage} height={320} />
+            <div className="min-h-[320px] flex-1 overflow-hidden rounded-lg border border-white/10">
+              <CodeViewer code={response.generated_test_code || ""} language={generatedCodeLanguage} height="100%" />
             </div>
           </div>
         )}

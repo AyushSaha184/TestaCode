@@ -57,11 +57,12 @@ class Settings(BaseModel):
 
 	llm_enabled: bool = Field(default=os.getenv("LLM_ENABLED", "false").lower() == "true")
 	llm_api_key: str = Field(default=os.getenv("LLM_API_KEY", ""))
+	cerebras_api_key: str = Field(default=os.getenv("CEREBRAS_API_KEY", ""))
 	openrouter_api_key: str = Field(default=os.getenv("OPENROUTER_API_KEY", ""))
 	google_api_key: str = Field(default=os.getenv("GOOGLE_API_KEY", ""))
 	llm_base_url: str = Field(default=os.getenv("LLM_BASE_URL", ""))
 	llm_fast_model: str = Field(default=os.getenv("LLM_FAST_MODEL", "gpt-4o-mini"))
-	llm_strong_model: str = Field(default=os.getenv("LLM_STRONG_MODEL", "gpt-4.1"))
+	llm_strong_model: str = Field(default=os.getenv("LLM_STRONG_MODEL", "qwen-3-235b-2507"))
 	llm_timeout_seconds: int = Field(default=int(os.getenv("LLM_TIMEOUT_SECONDS", "25")))
 	llm_max_retries: int = Field(default=int(os.getenv("LLM_MAX_RETRIES", "3")))
 	llm_enable_self_eval: bool = Field(default=os.getenv("LLM_ENABLE_SELF_EVAL", "false").lower() == "true")

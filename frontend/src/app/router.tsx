@@ -20,7 +20,7 @@ function AppShell() {
   const meta =
     pageMeta[location.pathname as keyof typeof pageMeta] ||
     (location.pathname.startsWith("/jobs/")
-      ? { title: "Job Detail", subtitle: "Inspect generated artifacts and rerun" }
+      ? { title: "Detailed Report", subtitle: "Inspect generated output and rerun" }
       : { title: "Dashboard", subtitle: "AI test generation control deck" });
 
   return (
