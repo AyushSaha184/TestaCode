@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from backend.app import app
-from backend.bootstrap import get_repository, get_storage_service
+from backend.bootstrap import get_repository
 from backend.schemas import InputMode, JobDetail, JobStatus, Language
 
 
@@ -29,42 +29,14 @@ class FakeRepository:
             warnings=[],
             uncovered_areas=[],
             source_file_path="uploads/session-test-1/python/add.py",
-            source_file_url=None,
             output_test_path="sessions/session-test-1/python/add/test_add.py",
             output_metadata_path="sessions/session-test-1/python/add/test_add.json",
-            output_test_url=None,
-            output_metadata_url=None,
-            auto_commit_enabled=False,
-            commit_sha=None,
-            workflow_name=None,
-            ci_status="file_written",
-            ci_conclusion=None,
-            ci_run_url=None,
-            ci_run_id=None,
-            ci_updated_at=datetime.now(timezone.utc),
             latest_run=None,
         )
 
 
-class FakeStorageService:
-    def is_configured(self) -> bool:
-        return True
-
-    def resolve_object_url(self, object_path: str):
-        return f"https://signed.local/{object_path}?token=1"
-
-
-class FailingStorageService:
-    def is_configured(self) -> bool:
-        return True
-
-    def resolve_object_url(self, object_path: str):
-        raise RuntimeError("supabase unavailable")
-
-
-def test_job_detail_includes_storage_urls() -> None:
+def test_job_detail_returns_basic_fields() -> None:
     app.dependency_overrides[get_repository] = lambda: FakeRepository()
-    app.dependency_overrides[get_storage_service] = lambda: FakeStorageService()
     client = TestClient(app)
     job_id = str(uuid4())
 
@@ -73,25 +45,7 @@ def test_job_detail_includes_storage_urls() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["output_test_path"] == "sessions/session-test-1/python/add/test_add.py"
-    assert payload["source_file_url"].startswith("https://signed.local/uploads/session-test-1/python/add.py")
-    assert payload["output_test_url"].startswith("https://signed.local/sessions/session-test-1/python/add/test_add.py")
-    assert payload["output_metadata_url"].startswith("https://signed.local/sessions/session-test-1/python/add/test_add.json")
-
-    app.dependency_overrides.clear()
-
-
-def test_job_detail_handles_storage_resolution_failure() -> None:
-    app.dependency_overrides[get_repository] = lambda: FakeRepository()
-    app.dependency_overrides[get_storage_service] = lambda: FailingStorageService()
-    client = TestClient(app)
-    job_id = str(uuid4())
-
-    response = client.get(f"/jobs/{job_id}", headers={"X-Session-Id": "session-test-1"})
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["output_test_url"] is None
-    assert payload["output_metadata_url"] is None
-    assert "Artifact URL refresh is temporarily unavailable" in payload["warnings"]
+    assert payload["status"] == "completed"
+    assert payload["framework_used"] == "pytest"
 
     app.dependency_overrides.clear()

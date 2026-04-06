@@ -63,19 +63,8 @@ class FakeDb:
                 "warnings": [],
                 "uncovered_areas": [],
                 "source_file_path": "uploads/session-test-1/python/source.py",
-                "source_file_url": "https://storage.local/source.py",
                 "output_test_path": "sessions/s1/python/add/test_add.py",
                 "output_metadata_path": "sessions/s1/python/add/test_add.json",
-                "output_test_url": "https://storage.local/test_add.py",
-                "output_metadata_url": "https://storage.local/test_add.json",
-                "auto_commit_enabled": False,
-                "commit_sha": None,
-                "workflow_name": None,
-                "ci_status": "file_written",
-                "ci_conclusion": None,
-                "ci_run_url": None,
-                "ci_run_id": None,
-                "ci_updated_at": datetime.now(timezone.utc),
             }
         if "FROM test_run_results" in query:
             return None
@@ -100,7 +89,7 @@ class FakeDb:
         return []
 
 
-def test_update_file_outputs_persists_paths_and_urls() -> None:
+def test_update_file_outputs_persists_paths() -> None:
     db = FakeDb()
     repo = GenerationRepository(db)
     job_id = uuid4()
@@ -108,23 +97,17 @@ def test_update_file_outputs_persists_paths_and_urls() -> None:
     repo.update_file_outputs(
         job_id=job_id,
         source_file_path="uploads/session-test-1/python/source.py",
-        source_file_url="https://storage.local/source.py",
         output_test_path="sessions/s1/python/add/test_add.py",
         output_metadata_path="sessions/s1/python/add/test_add.json",
-        output_test_url="https://storage.local/test_add.py",
-        output_metadata_url="https://storage.local/test_add.json",
-        ci_status="file_written",
     )
 
-    assert "output_test_url" in db.last_query
+    assert "output_test_path" in db.last_query
     assert db.last_params[0] == "uploads/session-test-1/python/source.py"
-    assert db.last_params[1] == "https://storage.local/source.py"
-    assert db.last_params[2] == "sessions/s1/python/add/test_add.py"
-    assert db.last_params[4] == "https://storage.local/test_add.py"
-    assert db.last_params[6] == "file_written"
+    assert db.last_params[1] == "sessions/s1/python/add/test_add.py"
+    assert db.last_params[2] == "sessions/s1/python/add/test_add.json"
 
 
-def test_get_job_maps_artifact_url_fields() -> None:
+def test_get_job_maps_artifact_path_fields() -> None:
     db = FakeDb()
     repo = GenerationRepository(db)
 
@@ -132,11 +115,8 @@ def test_get_job_maps_artifact_url_fields() -> None:
 
     assert job is not None
     assert job.source_file_path == "uploads/session-test-1/python/source.py"
-    assert job.source_file_url == "https://storage.local/source.py"
     assert job.output_test_path == "sessions/s1/python/add/test_add.py"
     assert job.output_metadata_path == "sessions/s1/python/add/test_add.json"
-    assert job.output_test_url == "https://storage.local/test_add.py"
-    assert job.output_metadata_url == "https://storage.local/test_add.json"
 
 
 def test_upsert_job_feedback_stores_snapshot_context() -> None:
@@ -150,7 +130,7 @@ def test_upsert_job_feedback_stores_snapshot_context() -> None:
         payload=JobFeedbackRequest(
             feedback_value=FeedbackValue.up,
             correction_text="Add exception path",
-            reviewer_notes="Great baseline",
+            reviewer_notes="Great baseline assertions",
         ),
     )
 

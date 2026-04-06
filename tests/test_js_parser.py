@@ -76,7 +76,11 @@ import axios from 'axios';
 import { readFile } from 'fs';
 const lodash = require('lodash');
 
-function processData(data) { return data; }
+function processData(data) {
+    axios.post('/events', data);
+    const parsed = readFile(data.path);
+    return lodash.pick(parsed, ['id']);
+}
 """
     parser = JavaScriptTypeScriptParser()
     result = parser.parse(Language.javascript, code)

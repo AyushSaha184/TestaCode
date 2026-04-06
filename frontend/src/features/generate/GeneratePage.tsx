@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { CodeViewer } from "@/components/common/CodeViewer";
+import { ErrorState } from "@/components/common/ErrorState";
+import { Skeleton } from "@/components/common/Skeleton";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useGenerateMutation } from "@/hooks/queries/useGenerateMutation";
-import type { InputMode, Language } from "@/types/api";
+import { useJobDetailQuery } from "@/hooks/queries/useJobDetailQuery";
+import type { GenerationResponse, InputMode, JobDetail, Language } from "@/types/api";
 
 const CLEAR_FORM_EVENT = "testacode:clear-generate-form";
 const DEFAULT_CODE = "";
@@ -115,7 +118,49 @@ function detectLanguageFromCode(source: string): Language | null {
   return bestMatch.language;
 }
 
+function extractRawCode(classifiedIntent: unknown): string {
+  if (!classifiedIntent || typeof classifiedIntent !== "object") {
+    return "";
+  }
+  const rawCode = (classifiedIntent as Record<string, unknown>).raw_code;
+  return typeof rawCode === "string" ? rawCode : "";
+}
+
+function mapJobDetailToGenerationResponse(detail: JobDetail): GenerationResponse {
+  return {
+    job_id: detail.id,
+    detected_language: detail.detected_language,
+    generated_test_code: detail.generated_test_code || "",
+    quality_score: detail.quality_score ?? 0,
+    uncovered_areas: detail.uncovered_areas,
+    warnings: detail.warnings,
+    framework_used: detail.framework_used || "unspecified",
+    output_test_path: detail.output_test_path,
+    output_metadata_path: detail.output_metadata_path,
+    output_test_url: detail.output_test_url,
+    output_metadata_url: detail.output_metadata_url,
+    commit_sha: detail.commit_sha,
+    ci_status: detail.ci_status,
+    ci_conclusion: detail.ci_conclusion,
+    ci_run_url: detail.ci_run_url,
+    ci_run_id: detail.ci_run_id,
+  };
+}
+
+interface GenerateNavigationState {
+  targetJobId?: string;
+  prefillPrompt?: string;
+  prefillCode?: string;
+}
+
 export function GeneratePage() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigationState = (location.state as GenerateNavigationState | null) || null;
+  const outputJobId = searchParams.get("jobId") || "";
+  const matchedPrefillState = navigationState?.targetJobId === outputJobId ? navigationState : null;
+
   const [userPrompt, setUserPrompt] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE);
   const [autoDetectedLanguage, setAutoDetectedLanguage] = useState<Language | null>(detectLanguageFromCode(DEFAULT_CODE));
@@ -123,14 +168,61 @@ export function GeneratePage() {
   const [filename, setFilename] = useState("");
   const [uploadFile, setUploadFile] = useState<File | undefined>();
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [hydratedJobId, setHydratedJobId] = useState<string | null>(null);
 
   const generateMutation = useGenerateMutation();
+  const outputJobQuery = useJobDetailQuery(outputJobId);
 
   const effectiveLanguage = useMemo(
     () => (languageMode === "auto" ? autoDetectedLanguage ?? "python" : languageMode),
     [autoDetectedLanguage, languageMode],
   );
   const inputMode: InputMode = uploadFile ? "upload" : "paste";
+
+  useEffect(() => {
+    setHydratedJobId(null);
+  }, [outputJobId]);
+
+  useEffect(() => {
+    if (!outputJobQuery.data || hydratedJobId === outputJobQuery.data.id) {
+      return;
+    }
+
+    if (matchedPrefillState?.prefillPrompt !== undefined) {
+      setUserPrompt(matchedPrefillState.prefillPrompt);
+    } else {
+      setUserPrompt(outputJobQuery.data.user_prompt || "");
+    }
+
+    const nextCode =
+      matchedPrefillState?.prefillCode !== undefined
+        ? matchedPrefillState.prefillCode
+        : extractRawCode(outputJobQuery.data.classified_intent);
+
+    setCode(nextCode);
+    setAutoDetectedLanguage(detectLanguageFromCode(nextCode));
+    setHydratedJobId(outputJobQuery.data.id);
+
+    if (matchedPrefillState) {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+        },
+        {
+          replace: true,
+          state: null,
+        },
+      );
+    }
+  }, [
+    hydratedJobId,
+    location.pathname,
+    location.search,
+    matchedPrefillState,
+    navigate,
+    outputJobQuery.data,
+  ]);
 
   useEffect(() => {
     const clearForm = () => {
@@ -141,12 +233,14 @@ export function GeneratePage() {
       setLanguageMode("auto");
       setFilename("");
       setFileInputKey((previous) => previous + 1);
+      setHydratedJobId(null);
       generateMutation.reset();
+      setSearchParams({}, { replace: true });
     };
 
     window.addEventListener(CLEAR_FORM_EVENT, clearForm);
     return () => window.removeEventListener(CLEAR_FORM_EVENT, clearForm);
-  }, [generateMutation]);
+  }, [generateMutation, setSearchParams]);
 
   const submit = async () => {
     if (!userPrompt.trim()) {
@@ -163,13 +257,18 @@ export function GeneratePage() {
         filename: filename || undefined,
         upload_file: uploadFile,
       });
+      setSearchParams({ jobId: response.job_id }, { replace: true });
       toast.success("Generated tests successfully");
     } catch (error) {
       toast.error((error as Error).message || "Generation failed");
     }
   };
 
-  const response = generateMutation.data;
+  const response = outputJobId
+    ? outputJobQuery.data
+      ? mapJobDetailToGenerationResponse(outputJobQuery.data)
+      : undefined
+    : generateMutation.data;
   const generatedCodeLanguage = response?.detected_language ?? effectiveLanguage;
   const editorLanguageLabel = languageMode === "auto" ? (autoDetectedLanguage ?? "") : effectiveLanguage;
 
@@ -216,7 +315,7 @@ export function GeneratePage() {
           </div>
 
           <label className="block text-sm">
-            <p className="section-label mb-2">Upload File (optional)</p>
+            <p className="section-label mb-2">Upload File</p>
             <input
               key={fileInputKey}
               type="file"
@@ -229,7 +328,6 @@ export function GeneratePage() {
                 }
               }}
             />
-            <p className="mt-1 text-xs text-slate-400">If a file is selected, upload mode is used automatically.</p>
           </label>
         </Card>
 
@@ -255,7 +353,21 @@ export function GeneratePage() {
         <div className="border-b border-white/10 pb-3">
           <h3 className="text-lg font-semibold text-white">Output</h3>
         </div>
-        {!response ? (
+        {outputJobId && outputJobQuery.isLoading && !response ? (
+          <div className="grid gap-3 py-4">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-8" />
+            <Skeleton className="h-64" />
+          </div>
+        ) : outputJobId && outputJobQuery.isError ? (
+          <div className="pt-4">
+            <ErrorState
+              title="Unable to load selected output"
+              description={(outputJobQuery.error as Error).message}
+              onRetry={() => outputJobQuery.refetch()}
+            />
+          </div>
+        ) : !response ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-[#0a1120] text-slate-400">
               <Sparkles size={22} aria-hidden="true" />
@@ -269,9 +381,33 @@ export function GeneratePage() {
               <StatusBadge value={response.ci_status || "completed"} />
                 <span className="tag-neutral">{response.framework_used}</span>
               </div>
-              <Link to={`/jobs/${response.job_id}`} className="text-sm text-accent-cyan underline-offset-4 hover:underline">
-                View details -&gt;
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(response.generated_test_code || "");
+                      toast.success("Generated code copied");
+                    } catch {
+                      toast.error("Failed to copy code");
+                    }
+                  }}
+                >
+                  Copy code
+                </button>
+                <Link
+                  to={`/jobs/${response.job_id}`}
+                  state={{
+                    targetJobId: response.job_id,
+                    prefillPrompt: userPrompt,
+                    prefillCode: code,
+                  }}
+                  className="text-sm text-accent-cyan underline-offset-4 hover:underline"
+                >
+                  View details -&gt;
+                </Link>
+              </div>
             </div>
 
             {(response.output_test_url || response.output_metadata_url) && (

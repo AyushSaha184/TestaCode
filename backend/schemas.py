@@ -92,7 +92,6 @@ class GenerationRequest(BaseModel):
 	filename: str | None = None
 	language: Language
 	user_prompt: str
-	auto_commit_enabled: bool = False
 
 
 class GenerationResponse(BaseModel):
@@ -106,16 +105,8 @@ class GenerationResponse(BaseModel):
 	warnings: list[str] = Field(default_factory=list)
 	framework_used: str
 	source_file_path: str | None = None
-	source_file_url: str | None = None
 	output_test_path: str | None = None
 	output_metadata_path: str | None = None
-	output_test_url: str | None = None
-	output_metadata_url: str | None = None
-	commit_sha: str | None = None
-	ci_status: str | None = None
-	ci_conclusion: str | None = None
-	ci_run_url: str | None = None
-	ci_run_id: str | None = None
 
 
 class JobSummary(BaseModel):
@@ -127,7 +118,6 @@ class JobSummary(BaseModel):
 	detected_language: Language
 	quality_score: int | None = None
 	framework_used: str | None = None
-	ci_status: str | None = None
 
 
 class TestRunResultModel(BaseModel):
@@ -137,7 +127,6 @@ class TestRunResultModel(BaseModel):
 	fail_count: int
 	error_count: int
 	coverage_percentage: float
-	ci_run_url: str | None = None
 	raw_results: dict[str, Any] | None = None
 
 
@@ -159,19 +148,8 @@ class JobDetail(BaseModel):
 	warnings: list[str] = Field(default_factory=list)
 	uncovered_areas: list[str] = Field(default_factory=list)
 	source_file_path: str | None = None
-	source_file_url: str | None = None
 	output_test_path: str | None = None
 	output_metadata_path: str | None = None
-	output_test_url: str | None = None
-	output_metadata_url: str | None = None
-	auto_commit_enabled: bool = False
-	commit_sha: str | None = None
-	workflow_name: str | None = None
-	ci_status: str | None = None
-	ci_conclusion: str | None = None
-	ci_run_url: str | None = None
-	ci_run_id: str | None = None
-	ci_updated_at: datetime | None = None
 	latest_run: TestRunResultModel | None = None
 
 
@@ -182,8 +160,6 @@ class RerunResult(BaseModel):
 	rerun_job_id: UUID
 	status: JobStatus
 	quality_score: int | None = None
-	ci_status: str | None = None
-	commit_sha: str | None = None
 
 
 class JobStatusView(BaseModel):
@@ -191,11 +167,6 @@ class JobStatusView(BaseModel):
 
 	job_id: UUID
 	status: JobStatus
-	ci_status: str | None = None
-	ci_conclusion: str | None = None
-	ci_run_url: str | None = None
-	ci_run_id: str | None = None
-	ci_updated_at: datetime | None = None
 
 
 class JobFeedbackRequest(BaseModel):

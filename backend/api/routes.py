@@ -6,13 +6,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile
 
 from backend.agents.orchestrator import GenerationOrchestrator
-from backend.bootstrap import get_orchestrator, get_repository, get_storage_service
+from backend.bootstrap import get_orchestrator, get_repository
 from backend.core.exceptions import AppError
 from backend.util.logger import get_logger
 from backend.core.config import get_settings
 from backend.input.normalizer import normalize_generation_request
 from backend.repositories.generation_repository import GenerationRepository
-from backend.services.supabase_storage_service import SupabaseStorageService
 from backend.schemas import (
     GenerationResponse,
     JobDetail,
@@ -35,7 +34,6 @@ async def generate_tests(
     code_content: Annotated[str | None, Form()] = None,
     filename: Annotated[str | None, Form()] = None,
     language: Annotated[str | None, Form()] = None,
-    auto_commit_enabled: Annotated[bool | None, Form()] = None,
     upload_file: UploadFile | None = File(default=None),
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     orchestrator: GenerationOrchestrator = Depends(get_orchestrator),
@@ -50,7 +48,6 @@ async def generate_tests(
         filename=filename,
         language=language,
         upload_file=upload_file,
-        auto_commit_enabled=auto_commit_enabled,
     )
     logger.info("generate_request_received", extra={"step": "request", "status": "ok"})
     return orchestrator.generate(request, warnings, idempotency_key=idempotency_key)
@@ -71,26 +68,10 @@ def get_job(
     job_id: UUID,
     session_id: Annotated[str, Header(alias="X-Session-Id")],
     repository: GenerationRepository = Depends(get_repository),
-    storage_service: SupabaseStorageService | None = Depends(get_storage_service),
 ) -> JobDetail:
     job = repository.get_job(job_id, session_id=session_id)
     if not job:
         raise AppError("Job not found", status_code=404)
-
-    if storage_service and storage_service.is_configured():
-        try:
-            if job.source_file_path:
-                job.source_file_url = storage_service.resolve_object_url(job.source_file_path)
-            if job.output_test_path:
-                job.output_test_url = storage_service.resolve_object_url(job.output_test_path)
-            if job.output_metadata_path:
-                job.output_metadata_url = storage_service.resolve_object_url(job.output_metadata_path)
-        except Exception as exc:
-            logger.warning(
-                "storage_url_resolution_failed",
-                extra={"step": "storage", "job_id": str(job_id), "status": "failed", "error": str(exc)[:500]},
-            )
-            job.warnings = [*job.warnings, "Artifact URL refresh is temporarily unavailable"]
     return job
 
 

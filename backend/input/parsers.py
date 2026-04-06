@@ -45,6 +45,9 @@ class PythonFunctionParser:
 		return functions
 
 
+_BUILTINS = frozenset(dir(__builtins__))
+
+
 def _find_dependency_candidates(node: ast.AST, params: Iterable[ParameterMetadata]) -> set[str]:
 	param_names = {item.name for item in params}
 	local_names: set[str] = set(param_names)
@@ -63,7 +66,7 @@ def _find_dependency_candidates(node: ast.AST, params: Iterable[ParameterMetadat
 					local_names.add(item.optional_vars.id)
 		if isinstance(child, ast.Call):
 			name = _call_name(child.func)
-			if name and name.split(".")[0] not in local_names:
+			if name and name.split(".")[0] not in local_names and name.split(".")[0] not in _BUILTINS:
 				dependency_names.add(name)
 
 	return dependency_names

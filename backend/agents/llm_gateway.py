@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as ExecTimeoutError
 from types import SimpleNamespace
 from typing import Any, Literal
 
@@ -44,7 +44,9 @@ class LLMGateway:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._fast = None
+        self._fast_fallback = None
         self._strong = None
+        self._executor = ThreadPoolExecutor(max_workers=4)
 
         if not settings.llm_enabled:
             return
@@ -69,6 +71,24 @@ class LLMGateway:
                     "llm_fast_provider_failed",
                     extra={"step": "llm_init", "provider": "google", "model": settings.llm_fast_model},
                 )
+
+            fallback_model = (settings.llm_fast_fallback_model or "").strip()
+            if fallback_model and fallback_model != settings.llm_fast_model:
+                try:
+                    self._fast_fallback = ChatGoogleGenerativeAI(
+                        model=fallback_model,
+                        google_api_key=settings.google_api_key,
+                        temperature=0.2,
+                    )
+                    logger.info(
+                        "llm_fast_fallback_provider_initialized",
+                        extra={"step": "llm_init", "provider": "google", "model": fallback_model},
+                    )
+                except Exception:
+                    logger.exception(
+                        "llm_fast_fallback_provider_failed",
+                        extra={"step": "llm_init", "provider": "google", "model": fallback_model},
+                    )
 
         if cerebras_api_key:
             try:
@@ -100,6 +120,8 @@ class LLMGateway:
             "authentication",
             "status code: 401",
             "status code: 403",
+            "model_not_found",
+            "does not exist or you do not have access",
         )
         return any(marker in message for marker in non_retryable_markers)
 
@@ -111,9 +133,16 @@ class LLMGateway:
         timeout_override: int | None = None,
         max_retries_override: int | None = None,
         _allow_tier_fallback: bool = True,
+        _allow_fast_model_fallback: bool = True,
+        _model_override: Any | None = None,
+        _model_name_override: str | None = None,
     ) -> str:
-        model = self._model(tier)
-        model_name = self.settings.llm_fast_model if tier == "fast" else self.settings.llm_strong_model
+        model = _model_override if _model_override is not None else self._model(tier)
+        model_name = (
+            _model_name_override
+            if _model_name_override is not None
+            else (self.settings.llm_fast_model if tier == "fast" else self.settings.llm_strong_model)
+        )
         effective_timeout = timeout_override if timeout_override is not None else self.settings.llm_timeout_seconds
         effective_retries = max_retries_override if max_retries_override is not None else self.settings.llm_max_retries
         last_error: Exception | None = None
@@ -139,14 +168,19 @@ class LLMGateway:
                             max_retries_override=max_retries_override,
                             _allow_tier_fallback=False,
                         )
+                    if tier == "fast":
+                        logger.warning(
+                            "llm_fast_model_missing",
+                            extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+                        )
+                        break
                     return self._fallback(system_prompt, user_prompt)
 
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        model.invoke,
-                        [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)],
-                    )
-                    response = future.result(timeout=effective_timeout)
+                future = self._executor.submit(
+                    model.invoke,
+                    [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)],
+                )
+                response = future.result(timeout=effective_timeout)
 
                 content = getattr(response, "content", "")
                 if isinstance(content, list):
@@ -170,8 +204,12 @@ class LLMGateway:
                     extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "ok"},
                 )
                 return text
-            except TimeoutError as exc:
+            except ExecTimeoutError as exc:
                 last_error = exc
+                try:
+                    future.cancel()
+                except Exception:
+                    pass
                 logger.warning(
                     "llm_call_timeout",
                     extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "timeout"},
@@ -183,6 +221,9 @@ class LLMGateway:
                     extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "error"},
                 )
                 if self._is_non_retryable_error(exc):
+                    if tier == "strong":
+                        # Prevent repeated hard-fail calls to an invalid/unavailable strong model.
+                        self._strong = None
                     logger.warning(
                         "llm_call_non_retryable_error",
                         extra={"step": "llm_call", "attempt": attempt, "model": model_name, "status": "terminal"},
@@ -193,21 +234,79 @@ class LLMGateway:
                 time.sleep(min(2 ** (attempt - 1), 6))
 
         if tier == "fast":
+            if _allow_fast_model_fallback and _allow_tier_fallback and model is self._fast and self._fast_fallback is not None:
+                fallback_model_name = self.settings.llm_fast_fallback_model
+                logger.warning(
+                    "llm_fast_fallback_to_google_backup",
+                    extra={"step": "llm_call", "status": "fallback", "from_model": model_name, "to_model": fallback_model_name},
+                )
+                return self.invoke_text(
+                    system_prompt,
+                    user_prompt,
+                    tier="fast",
+                    timeout_override=timeout_override,
+                    max_retries_override=max_retries_override,
+                    _allow_tier_fallback=True,
+                    _allow_fast_model_fallback=False,
+                    _model_override=self._fast_fallback,
+                    _model_name_override=fallback_model_name,
+                )
+
             if _allow_tier_fallback and self._strong is not None and self._strong is not model:
                 logger.warning(
                     "llm_fast_fallback_to_strong",
                     extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
                 )
-                return self.invoke_text(
-                    system_prompt,
-                    user_prompt,
-                    tier="strong",
-                    timeout_override=timeout_override,
-                    max_retries_override=max_retries_override,
-                    _allow_tier_fallback=False,
-                )
+                try:
+                    return self.invoke_text(
+                        system_prompt,
+                        user_prompt,
+                        tier="strong",
+                        timeout_override=timeout_override,
+                        max_retries_override=max_retries_override,
+                        _allow_tier_fallback=False,
+                    )
+                except Exception:
+                    logger.warning(
+                        "llm_fast_fallback_to_strong_failed_local_fallback",
+                        extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+                    )
+                    return self._fallback(system_prompt, user_prompt)
             logger.warning(
                 "llm_fast_fallback_local",
+                extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+            )
+            return self._fallback(system_prompt, user_prompt)
+
+        if not _allow_tier_fallback:
+            logger.warning(
+                "llm_strong_fallback_local",
+                extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+            )
+            return self._fallback(system_prompt, user_prompt)
+
+        if tier == "strong":
+            if self._fast is not None:
+                logger.warning(
+                    "llm_strong_fallback_to_fast_after_failure",
+                    extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+                )
+                try:
+                    return self.invoke_text(
+                        system_prompt,
+                        user_prompt,
+                        tier="fast",
+                        timeout_override=timeout_override,
+                        max_retries_override=max_retries_override,
+                        _allow_tier_fallback=False,
+                    )
+                except Exception:
+                    logger.warning(
+                        "llm_strong_fallback_to_fast_failed_local_fallback",
+                        extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
+                    )
+            logger.warning(
+                "llm_strong_fallback_local",
                 extra={"step": "llm_call", "status": "fallback", "from_model": model_name},
             )
             return self._fallback(system_prompt, user_prompt)

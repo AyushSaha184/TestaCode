@@ -30,8 +30,8 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
     },
     {
       to: "/jobs",
-      label: "Job History",
-      description: "Review past generations",
+      label: "Output History",
+      description: "Review past outputs",
       icon: History,
     },
     {

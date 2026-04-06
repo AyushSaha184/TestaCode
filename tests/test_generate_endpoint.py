@@ -21,14 +21,9 @@ class FakeOrchestrator:
             uncovered_areas=["null input"],
             warnings=initial_warnings,
             framework_used="pytest",
-            source_file_path="uploads/session-test-1/python/add.py",
-            source_file_url="https://storage.local/add.py",
+            source_file_path=None,
             output_test_path="generated_tests/python/add/test_add.py",
             output_metadata_path="generated_tests/python/add/test_add.json",
-            output_test_url="https://storage.local/test_add.py",
-            output_metadata_url="https://storage.local/test_add.json",
-            commit_sha="abc123",
-            ci_status="ci_pending",
         )
 
     def rerun(self, job_id, session_id):
@@ -38,8 +33,6 @@ class FakeOrchestrator:
             rerun_job_id=uuid4(),
             status=JobStatus.completed,
             quality_score=8,
-            ci_status="not_triggered",
-            commit_sha="abc123",
         )
 
     def get_status(self, job_id, session_id):
@@ -47,11 +40,6 @@ class FakeOrchestrator:
         return JobStatusView(
             job_id=job_id,
             status=JobStatus.completed,
-            ci_status="file_written",
-            ci_conclusion=None,
-            ci_run_url=None,
-            ci_run_id=None,
-            ci_updated_at=None,
         )
 
 
@@ -75,11 +63,7 @@ def test_generate_endpoint_form_contract() -> None:
     assert payload["framework_used"] == "pytest"
     assert payload["quality_score"] == 8
     assert payload["detected_language"] == "python"
-    assert payload["source_file_path"] == "uploads/session-test-1/python/add.py"
-    assert payload["source_file_url"] == "https://storage.local/add.py"
     assert payload["output_test_path"] == "generated_tests/python/add/test_add.py"
-    assert payload["output_test_url"] == "https://storage.local/test_add.py"
-    assert payload["commit_sha"] == "abc123"
 
     app.dependency_overrides.clear()
 
@@ -91,6 +75,6 @@ def test_status_endpoints_contract() -> None:
 
     status_response = client.get(f"/jobs/{job_id}/status", headers={"X-Session-Id": "session-test-1"})
     assert status_response.status_code == 200
-    assert status_response.json()["ci_status"] == "file_written"
+    assert status_response.json()["status"] == "completed"
 
     app.dependency_overrides.clear()

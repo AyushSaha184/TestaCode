@@ -12,7 +12,7 @@ function AppShell() {
 
   const pageMeta = {
     "/generate": { title: "Generate", subtitle: "Build tests from code or uploads" },
-    "/jobs": { title: "Job History", subtitle: "Search and review generated test jobs" },
+    "/jobs": { title: "Output History", subtitle: "Search and review generated outputs" },
     "/analytics": { title: "Analytics", subtitle: "Quality and execution trends" },
     "/settings": { title: "Settings", subtitle: "Runtime preferences" },
   };

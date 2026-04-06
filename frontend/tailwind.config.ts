@@ -33,7 +33,8 @@ const config: Config = {
           "radial-gradient(circle at 20% 10%, rgba(27,197,255,.12), transparent 30%), radial-gradient(circle at 80% 0%, rgba(212,76,255,.12), transparent 32%), radial-gradient(circle at 50% 100%, rgba(79,124,255,.12), transparent 30%)",
       },
       fontFamily: {
-        sans: ["Space Grotesk", "Segoe UI", "sans-serif"],
+        sans: ["Inter", "Segoe UI", "sans-serif"],
+        mono: ["JetBrains Mono", "Consolas", "monospace"],
       },
     },
   },

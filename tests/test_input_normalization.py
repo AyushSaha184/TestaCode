@@ -23,7 +23,6 @@ async def test_normalize_paste_success() -> None:
         filename=None,
         language="python",
         upload_file=None,
-        auto_commit_enabled=None,
     )
 
     assert request.input_mode == InputMode.paste
@@ -43,7 +42,6 @@ async def test_normalize_paste_autodetects_language_when_omitted() -> None:
         filename=None,
         language=None,
         upload_file=None,
-        auto_commit_enabled=None,
     )
 
     assert request.input_mode == InputMode.paste
@@ -66,7 +64,6 @@ async def test_normalize_upload_rejects_unsupported_extension() -> None:
             filename=None,
             language=None,
             upload_file=upload,
-            auto_commit_enabled=None,
         )
 
     assert exc_info.value.status_code == 422
@@ -92,7 +89,6 @@ async def test_normalize_paste_autodetects_new_languages(code_content: str, expe
         filename=None,
         language=None,
         upload_file=None,
-        auto_commit_enabled=None,
     )
 
     assert request.language == expected_language
@@ -111,7 +107,6 @@ async def test_normalize_prompt_only_defaults_to_python() -> None:
         filename=None,
         language=None,
         upload_file=None,
-        auto_commit_enabled=None,
     )
 
     assert request.input_mode == InputMode.paste
@@ -132,7 +127,6 @@ async def test_normalize_prompt_only_preserves_explicit_language() -> None:
         filename=None,
         language="golang",
         upload_file=None,
-        auto_commit_enabled=None,
     )
 
     assert request.language == Language.golang
@@ -162,7 +156,6 @@ async def test_normalize_upload_accepts_new_language_extensions(filename: str, c
         filename=None,
         language=None,
         upload_file=upload,
-        auto_commit_enabled=None,
     )
 
     assert request.input_mode == InputMode.upload

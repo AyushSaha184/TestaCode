@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import tempfile
 
 from backend.schemas import Language
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove surrounding markdown code fences from LLM output."""
+    text = text.strip()
+    text = re.sub(r"^```\w*\s*\n", "", text)
+    text = re.sub(r"\n```\s*$", "", text)
+    return text.strip()
 
 
 def validate_generated_code(language: Language, generated_code: str) -> tuple[bool, str | None]:
@@ -18,8 +27,10 @@ def validate_generated_code(language: Language, generated_code: str) -> tuple[bo
 	if language in (Language.javascript, Language.typescript):
 		return _validate_with_node(language, generated_code)
 
-	# Java syntax validation is intentionally deferred in this phase.
-	return True, None
+	if language in (Language.java, Language.rust, Language.golang, Language.csharp):
+		return True, f"Validation skipped for {language.value}: runtime validator not configured"
+
+	return True, f"Validation skipped for {language.value}: unsupported language"
 
 
 def _validate_with_node(language: Language, generated_code: str) -> tuple[bool, str | None]:

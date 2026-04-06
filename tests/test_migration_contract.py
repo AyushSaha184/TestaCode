@@ -13,6 +13,8 @@ def test_generation_jobs_contract_columns_present_in_migrations() -> None:
             "003_session_isolation.sql",
             "004_storage_and_contract_alignment.sql",
             "005_source_upload_artifacts.sql",
+            "006_hitl_feedback_and_parser_cache_ready.sql",
+            "007_remove_cicd_and_supabase.sql",
         ]
     ).lower()
 
@@ -33,19 +35,8 @@ def test_generation_jobs_contract_columns_present_in_migrations() -> None:
         "warnings",
         "uncovered_areas",
         "source_file_path",
-        "source_file_url",
         "output_test_path",
         "output_metadata_path",
-        "output_test_url",
-        "output_metadata_url",
-        "auto_commit_enabled",
-        "commit_sha",
-        "workflow_name",
-        "ci_status",
-        "ci_conclusion",
-        "ci_run_url",
-        "ci_run_id",
-        "ci_updated_at",
     ]
 
     for token in required_tokens:
@@ -57,5 +48,4 @@ def test_required_indexes_present_in_migrations() -> None:
 
     assert "idx_generation_jobs_session_created_at_desc" in sql
     assert "idx_generation_jobs_status" in sql
-    assert "idx_generation_jobs_ci_status" in sql
     assert "idx_test_run_results_job_id_run_timestamp_desc" in sql

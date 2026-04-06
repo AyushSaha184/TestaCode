@@ -16,9 +16,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 - Session-isolated generation requests via `X-Session-Id`
 - Multi-stage backend pipeline: normalize -> parse -> classify -> analyze -> generate -> validate/correct -> self-evaluate -> persist
 - Postgres-backed job lifecycle with migration-based schema contracts
-- Redis-first caches for parser results, intent classification, and idempotency, with in-process TTL fallback
-- Optional Supabase Storage upload with signed/public artifact URLs
-- Optional Git auto-commit and push workflow for generated artifacts
+- In-process TTL caches for parser results, intent classification, and idempotency
 - Frontend dashboard for generation, job history, job detail, rerun, and analytics
 
 ## Table of Contents
@@ -96,7 +94,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 │   ├── core/
 │   │   ├── config.py                  # Settings and env parsing
 │   │   ├── database.py                # psycopg-backed DB client
-│   │   ├── cache.py                   # In-memory and Redis TTL caches
+│   │   ├── cache.py                   # In-memory TTL caches
 │   │   ├── middleware.py              # Request ID + latency middleware
 │   │   ├── exceptions.py              # AppError + global handlers
 │   │   └── logger.py                  # Structured logging setup
@@ -109,9 +107,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 │   ├── repositories/
 │   │   └── generation_repository.py   # SQL persistence for jobs and test runs
 │   ├── services/
-│   │   ├── file_output_service.py     # Atomic write + storage upload
-│   │   ├── supabase_storage_service.py# Storage object upload + URL resolution
-│   │   └── git_integration_service.py # Safe path validation + git add/commit/push
+│   │   └── file_output_service.py     # Atomic local file writes
 │   ├── app.py                         # FastAPI factory
 │   ├── bootstrap.py                   # DI wiring and singleton providers
 │   ├── main.py                        # Export app entrypoint
@@ -153,7 +149,7 @@ Frontend submits multipart form data to `POST /generate` with:
 - `input_mode`
 - `user_prompt`
 - `code_content` or `upload_file`
-- optional `language`, `filename`, `auto_commit_enabled`
+- optional `language`, `filename`
 - header `X-Session-Id` (required)
 - header `Idempotency-Key` (optional)
 
@@ -186,13 +182,9 @@ The backend validates:
 
 ### 5) Persistence and Artifacts
 
-The orchestrator stores all intermediate and final outputs in `generation_jobs`, writes artifact files, and optionally uploads artifacts to Supabase Storage.
+The orchestrator stores all intermediate and final outputs in `generation_jobs` and writes local artifact files.
 
-### 6) Optional Git Automation
-
-When enabled, generated artifact files are committed (and optionally pushed). Path safety checks ensure only files under `generated_tests` are eligible.
-
-### 7) Retrieval and Rerun
+### 6) Retrieval and Rerun
 
 - `GET /jobs` returns session-scoped paginated history
 - `GET /jobs/{job_id}` returns full details plus latest run stats
@@ -231,7 +223,7 @@ When enabled, generated artifact files are committed (and optionally pushed). Pa
 - Python 3.10+
 - Node.js 20+
 - PostgreSQL (required for runtime DB)
-- Optional: Redis, Supabase Storage credentials, LLM API keys
+- Optional: LLM API keys
 
 ### 1) Backend Setup
 
@@ -280,32 +272,16 @@ LLM_ENABLED=false
 LLM_API_KEY=
 CEREBRAS_API_KEY=
 GOOGLE_API_KEY=
-LLM_FAST_MODEL=gpt-4o-mini
-LLM_STRONG_MODEL=qwen-3-235b-2507
+LLM_FAST_MODEL=gemini-3.0-flash-preview
+LLM_FAST_FALLBACK_MODEL=gemini-2.5-flash
+LLM_STRONG_MODEL=qwen-3-235b-a22b-instruct-2507
 LLM_TIMEOUT_SECONDS=25
 LLM_MAX_RETRIES=3
 
 # Caching
-USE_REDIS_CACHE=true
-REDIS_URL=redis://localhost:6379/0
 PARSER_CACHE_TTL_SECONDS=600
 INTENT_CACHE_TTL_SECONDS=600
 IDEMPOTENCY_TTL_SECONDS=3600
-
-# Storage
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_STORAGE_BUCKET=code-files
-SUPABASE_STORAGE_PUBLIC=false
-SUPABASE_SIGNED_URL_TTL_SECONDS=3600
-
-# Git Automation
-AUTO_COMMIT_DEFAULT=false
-ENABLE_GIT_PUSH=false
-GIT_AUTHOR_NAME=ai-test-gen-bot
-GIT_AUTHOR_EMAIL=ai-test-gen-bot@example.com
-REPOSITORY_ROOT=.
-GENERATED_TESTS_DIR=generated_tests
 ```
 
 ### Frontend Environment Variables

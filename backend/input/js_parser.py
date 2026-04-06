@@ -41,6 +41,18 @@ _METHOD_RE = re.compile(
 
 # import ... from 'module'  /  require('module')
 _IMPORT_FROM_RE = re.compile(r"""(?:from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))""")
+_IMPORT_ALIAS_RE = re.compile(
+	r"^\s*import\s+(?:\*\s+as\s+)?(?P<alias>[a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['\"](?P<module>[^'\"]+)['\"]",
+	re.MULTILINE,
+)
+_DESTRUCTURED_IMPORT_RE = re.compile(
+	r"^\s*import\s*\{(?P<names>[^}]+)\}\s*from\s+['\"](?P<module>[^'\"]+)['\"]",
+	re.MULTILINE,
+)
+_REQUIRE_ALIAS_RE = re.compile(
+	r"^\s*(?:const|let|var)\s+(?P<alias>[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*require\(\s*['\"](?P<module>[^'\"]+)['\"]\s*\)",
+	re.MULTILINE,
+)
 
 _BUILTIN_SKIP = frozenset({"if", "else", "for", "while", "switch", "catch", "return", "throw", "new", "delete", "typeof", "void", "constructor"})
 
@@ -60,7 +72,7 @@ class JavaScriptTypeScriptParser:
 	def _extract(self, code: str) -> list[FunctionMetadata]:
 		seen: set[str] = set()
 		results: list[FunctionMetadata] = []
-		dep_hints = self._extract_dependency_hints(code)
+		module_aliases = self._extract_import_aliases(code)
 
 		for pattern in (_FUNC_DECL_RE, _ARROW_RE, _FUNC_EXPR_RE, _METHOD_RE):
 			for match in pattern.finditer(code):
@@ -70,6 +82,8 @@ class JavaScriptTypeScriptParser:
 				seen.add(name)
 				raw_params = match.group("params").strip()
 				params = self._parse_params(raw_params) if raw_params else []
+				block_text = self._extract_function_block(code, match.start())
+				dep_hints = self._extract_dependency_hints_for_block(block_text, module_aliases)
 				results.append(
 					FunctionMetadata(
 						name=name,
@@ -103,10 +117,56 @@ class JavaScriptTypeScriptParser:
 		return params
 
 	@staticmethod
-	def _extract_dependency_hints(code: str) -> list[str]:
+	def _extract_import_aliases(code: str) -> dict[str, str]:
+		aliases: dict[str, str] = {}
+		for match in _IMPORT_ALIAS_RE.finditer(code):
+			module = (match.group("module") or "").strip()
+			alias = (match.group("alias") or "").strip()
+			if module and alias and not module.startswith("."):
+				aliases[alias] = module
+
+		for match in _DESTRUCTURED_IMPORT_RE.finditer(code):
+			module = (match.group("module") or "").strip()
+			names = (match.group("names") or "").split(",")
+			if not module or module.startswith("."):
+				continue
+			for name in names:
+				cleaned = name.strip().split(" as ")[-1].strip()
+				if cleaned:
+					aliases[cleaned] = module
+
+		for match in _REQUIRE_ALIAS_RE.finditer(code):
+			module = (match.group("module") or "").strip()
+			alias = (match.group("alias") or "").strip()
+			if module and alias and not module.startswith("."):
+				aliases[alias] = module
+
+		return aliases
+
+	@staticmethod
+	def _extract_function_block(code: str, start_idx: int) -> str:
+		line_start = code.rfind("\n", 0, start_idx)
+		line_start = 0 if line_start == -1 else line_start + 1
+		next_marker = code.find("\nfunction ", line_start + 1)
+		for marker in ("\nconst ", "\nlet ", "\nvar ", "\nclass "):
+			candidate = code.find(marker, line_start + 1)
+			if candidate != -1 and (next_marker == -1 or candidate < next_marker):
+				next_marker = candidate
+		if next_marker == -1:
+			return code[line_start:]
+		return code[line_start:next_marker]
+
+	@staticmethod
+	def _extract_dependency_hints_for_block(block_text: str, module_aliases: dict[str, str]) -> list[str]:
 		hints: set[str] = set()
-		for m in _IMPORT_FROM_RE.finditer(code):
+
+		for alias, module in module_aliases.items():
+			if re.search(rf"\b{re.escape(alias)}\b", block_text):
+				hints.add(module)
+
+		for m in _IMPORT_FROM_RE.finditer(block_text):
 			module = m.group(1) or m.group(2)
 			if module and not module.startswith("."):
 				hints.add(module)
+
 		return sorted(hints)

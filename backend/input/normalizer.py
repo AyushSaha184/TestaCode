@@ -90,7 +90,6 @@ async def normalize_generation_request(
     filename: str | None,
     language: str | None,
     upload_file: UploadFile | None,
-    auto_commit_enabled: bool | None,
 ) -> tuple[GenerationRequest, list[str]]:
     warnings: list[str] = []
 
@@ -149,7 +148,6 @@ async def normalize_generation_request(
             if not normalized_code:
                 raise AppError("code_content is required when input_mode=paste", status_code=422)
             detected_language = _detect_language_from_code(normalized_code)
-        normalized_code = code_content or ""
 
     request = GenerationRequest(
         session_id=session_id.strip(),
@@ -158,6 +156,5 @@ async def normalize_generation_request(
         filename=safe_filename,
         language=detected_language,
         user_prompt=user_prompt,
-        auto_commit_enabled=settings.auto_commit_default if auto_commit_enabled is None else auto_commit_enabled,
     )
     return request, warnings

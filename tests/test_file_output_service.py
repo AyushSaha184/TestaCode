@@ -69,39 +69,12 @@ def test_file_writer_atomic_and_metadata() -> None:
     assert "test_ok2" in (root / second.local_test_file_path).resolve().read_text(encoding="utf-8")
 
 
-class FakeStorageService:
-    def is_configured(self) -> bool:
-        return True
-
-    def upload_text(self, *, object_path: str, content: str, content_type: str):
-        class _Result:
-            def __init__(self, object_path: str):
-                self.object_path = object_path
-                self.url = f"https://storage.local/{object_path}"
-
-        return _Result(object_path)
-
-
-def test_file_writer_uploads_storage_when_configured() -> None:
+def test_file_writer_reports_storage_not_configured() -> None:
     service = FileOutputService(
         repository_root=".",
         generated_tests_dir="generated_tests",
-        storage_service=FakeStorageService(),
     )
-
-    test_path, metadata_path, test_url, metadata_url, warnings = service.upload_output_artifacts(
-        session_id="session-test-2",
-        detected_language=Language.typescript,
-        feature_name="sum_values",
-        generated_test_code="test('ok', () => expect(true).toBe(true));\n",
-        metadata_payload={"job_id": "123"},
-    )
-
-    assert test_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
-    assert metadata_path == "sessions/session-test-2/typescript/sum_values/test_sum_values.json"
-    assert test_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.ts"
-    assert metadata_url == "https://storage.local/sessions/session-test-2/typescript/sum_values/test_sum_values.json"
-    assert warnings == []
+    assert service.is_storage_configured() is False
 
 
 def test_file_writer_uses_new_language_extension() -> None:

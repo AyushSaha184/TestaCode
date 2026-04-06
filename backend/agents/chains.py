@@ -6,7 +6,7 @@ from backend.agents.prompts import (
 	build_generation_prompts,
 	build_self_eval_prompts,
 )
-from backend.agents.tools import validate_generated_code
+from backend.agents.tools import _strip_code_fences, validate_generated_code
 from backend.core.config import Settings
 from backend.util.logger import get_logger
 from backend.schemas import UnifiedContext
@@ -32,14 +32,16 @@ class TestGenerationChain:
 			timeout_override=self.settings.llm_gen_timeout_seconds,
 			max_retries_override=self.settings.llm_gen_max_retries,
 		)
+		result = _strip_code_fences(text)
 		logger.info("generation_call_completed", extra={"step": "generation", "status": "ok"})
-		return text
+		return result
 
 	def run_validation_and_correction(self, context: UnifiedContext, generated_code: str) -> tuple[str, list[str]]:
 		warnings: list[str] = []
 		candidate = generated_code
+		max_attempts = 3
 
-		for attempt in range(0, 3):
+		for attempt in range(1, max_attempts + 1):
 			valid, error_text = validate_generated_code(context.detected_language, candidate)
 			logger.info(
 				"validation_attempt",
@@ -50,16 +52,18 @@ class TestGenerationChain:
 				},
 			)
 			if valid:
+				if error_text:
+					warnings.append(error_text)
 				return candidate, warnings
 
-			if attempt >= 2:
+			if attempt == max_attempts:
 				warnings.append(f"Validation failed after retries: {error_text}")
 				return candidate, warnings
 
-			warnings.append(f"Validation retry {attempt + 1}: {error_text}")
+			warnings.append(f"Validation retry {attempt}: {error_text}")
 			logger.info(
 				"correction_call_started",
-				extra={"step": "correction", "attempt": attempt + 1, "status": "processing"},
+				extra={"step": "correction", "attempt": attempt, "status": "processing"},
 			)
 			system_prompt, user_prompt = build_correction_prompts(
 				context.detected_language.value,
@@ -67,9 +71,10 @@ class TestGenerationChain:
 				error_text or "unknown syntax error",
 			)
 			candidate = self.llm.invoke_text(system_prompt, user_prompt, tier="fast")
+			candidate = _strip_code_fences(candidate)
 			logger.info(
 				"correction_call_completed",
-				extra={"step": "correction", "attempt": attempt + 1, "status": "ok"},
+				extra={"step": "correction", "attempt": attempt, "status": "ok"},
 			)
 
 		return candidate, warnings

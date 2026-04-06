@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { RefreshCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Card } from "@/components/common/Card";
@@ -15,8 +15,24 @@ import { useRerunMutation } from "@/hooks/queries/useRerunMutation";
 import type { FeedbackValue } from "@/types/api";
 import { formatDate } from "@/utils/format";
 
+interface GenerateReturnState {
+  targetJobId?: string;
+  prefillPrompt?: string;
+  prefillCode?: string;
+}
+
+function extractRawCode(classifiedIntent: unknown): string {
+  if (!classifiedIntent || typeof classifiedIntent !== "object") {
+    return "";
+  }
+  const rawCode = (classifiedIntent as Record<string, unknown>).raw_code;
+  return typeof rawCode === "string" ? rawCode : "";
+}
+
 export function JobDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const generateReturnState = (location.state as GenerateReturnState | null) || null;
   const { jobId = "" } = useParams();
   const detailQuery = useJobDetailQuery(jobId);
   const statusQuery = useJobStatusQuery(jobId);
@@ -67,7 +83,26 @@ export function JobDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               className="btn-ghost"
-              onClick={() => navigate("/generate")}
+              onClick={() => {
+                if (generateReturnState?.targetJobId) {
+                  navigate(`/generate?jobId=${generateReturnState.targetJobId}`, {
+                    state: {
+                      targetJobId: generateReturnState.targetJobId,
+                      prefillPrompt: generateReturnState.prefillPrompt,
+                      prefillCode: generateReturnState.prefillCode,
+                    },
+                  });
+                  return;
+                }
+
+                navigate(`/generate?jobId=${detail.id}`, {
+                  state: {
+                    targetJobId: detail.id,
+                    prefillPrompt: detail.user_prompt,
+                    prefillCode: extractRawCode(detail.classified_intent),
+                  },
+                });
+              }}
             >
               Back to output
             </button>

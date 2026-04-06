@@ -37,38 +37,24 @@ class PromptIntentClassifier:
 		self.cache = cache or TTLCache[str, IntentClassification](ttl_seconds)
 
 	def classify(self, prompt: str, language: Language, code: str, function_metadata: list[FunctionMetadata] | None = None) -> tuple[IntentClassification, list[str]]:
-		code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-		cache_key = f"{prompt}:{language.value}:{code_hash}"
-		cached = self.cache.get(cache_key)
-		if cached is not None:
-			logger.info("intent_classifier_cache_hit", extra={"step": "intent", "status": "ok"})
-			warnings = ["Low confidence intent classification; generation continued"] if cached.confidence < 0.55 else []
-			return cached, warnings
-
-		system_prompt = (
-			"You are an intent classifier for software test generation. Return strict JSON with keys: "
-			"test_type(unit|integration|edge|mixed), target_scope, target_framework(pytest|unittest|jest|mocha|unspecified), "
-			"special_requirements(list of strings), confidence(float 0..1)."
-		)
-		context_summary = _compact_code_summary(code, function_metadata)
-		user_prompt = f"Language: {language.value}\nPrompt: {prompt}\n{context_summary}"
-		payload = self.llm.invoke_json(system_prompt, user_prompt, tier="fast")
-		intent = IntentClassification.model_validate(payload, strict=False)
-		self.cache.set(cache_key, intent)
-
-		warnings: list[str] = []
-		if intent.confidence < 0.55:
-			warnings.append("Low confidence intent classification; generation continued")
-
-		logger.info(
-			"intent_classifier_completed",
-			extra={"step": "intent", "status": "ok", "attempt": 1},
-		)
-		return intent, warnings
+		return self._do_classify(None, prompt, language, code, function_metadata)
 
 	def classify_for_session(self, session_id: str, prompt: str, language: Language, code: str, function_metadata: list[FunctionMetadata] | None = None) -> tuple[IntentClassification, list[str]]:
+		return self._do_classify(session_id, prompt, language, code, function_metadata)
+
+	def _do_classify(
+		self,
+		session_id: str | None,
+		prompt: str,
+		language: Language,
+		code: str,
+		function_metadata: list[FunctionMetadata] | None = None,
+	) -> tuple[IntentClassification, list[str]]:
 		code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-		cache_key = f"{session_id}:{prompt}:{language.value}:{code_hash}"
+		if session_id:
+			cache_key = f"{session_id}:{prompt}:{language.value}:{code_hash}"
+		else:
+			cache_key = f"{prompt}:{language.value}:{code_hash}"
 		cached = self.cache.get(cache_key)
 		if cached is not None:
 			logger.info("intent_classifier_cache_hit", extra={"step": "intent", "status": "ok"})
