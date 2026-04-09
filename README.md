@@ -1,5 +1,9 @@
 # AI-Test-Gen
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+
 AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and a React + TypeScript dashboard. It accepts pasted code or uploaded source files, classifies testing intent, generates tests using an LLM-driven chain, validates syntax, stores artifacts and metadata, and optionally auto-commits outputs to Git.
 
 ### Architecture Diagram
@@ -10,6 +14,28 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 
 ![Data Flow Diagram](https://i.postimg.cc/G2sV0TLK/dataflow.png)
 
+## Quick Start
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/yourusername/AI-Test-Gen.git
+cd AI-Test-Gen
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your DATABASE_URL and optional LLM keys
+
+# 3. Start (Windows)
+.\server.bat
+
+# Or manually:
+# Backend: uvicorn backend.app:app --reload --port 8000
+# Frontend: cd frontend && npm run dev
+```
+
+Then open `http://localhost:5173` in your browser.
+
+---
 
 ## Live Architecture Focus
 
@@ -22,6 +48,7 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 ## Table of Contents
 
 - [Features](#features)
+- [Supported Languages & Frameworks](#supported-languages--frameworks)
 - [Project Structure](#project-structure)
 - [How AI-Test-Gen Works](#how-ai-test-gen-works)
 - [API Reference](#api-reference)
@@ -29,10 +56,36 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [Deployment](#deployment)
+- [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
 ## Features
+
+- **Input modes**: Paste code directly or upload source files (`.py`, `.js`, `.ts`, `.java`)
+- **Language detection**: Automatic language detection for pasted code
+- **Smart parsing**: Python AST parser with caching; LLM-based parser for JS/TS
+- **Intent classification**: Predicts test type, scope, framework, and confidence level
+- **Multi-stage generation**: Analysis -> generation -> validation -> self-evaluation
+- **Syntax validation**: Auto-corrects syntax errors (up to 3 retry attempts)
+- **Job lifecycle**: Queued → processing → completed/failed with full state tracking
+- **Artifact storage**: Test files + metadata JSON, locally or via Supabase
+- **Rerun support**: Regenerate tests from saved code snapshot
+- **Human feedback**: Thumbs up/down with optional correction notes
+- **Session isolation**: Clean separation via `X-Session-Id` header
+- **Idempotency**: Prevent duplicate generations with `Idempotency-Key`
+- **Modern UI**: React 19, Monaco editor, code viewer, analytics dashboard
+
+## Supported Languages & Frameworks
+
+| Language | Test Framework | Parser |
+|----------|---------------|--------|
+| Python | pytest | AST-based |
+| JavaScript | Jest | LLM JSON schema |
+| TypeScript | Jest | LLM JSON schema |
+| Java | JUnit | LLM JSON schema |
+
+## Project Structure
 
 ### Core Generation Pipeline
 
@@ -140,59 +193,6 @@ AI-Test-Gen is an AI-powered test generation platform with a FastAPI backend and
 └── requirements.txt
 ```
 
-## How AI-Test-Gen Works
-
-### 1) Request Intake
-
-Frontend submits multipart form data to `POST /generate` with:
-
-- `input_mode`
-- `user_prompt`
-- `code_content` or `upload_file`
-- optional `language`, `filename`
-- header `X-Session-Id` (required)
-- header `Idempotency-Key` (optional)
-
-### 2) Normalization and Validation
-
-The backend validates:
-
-- required headers and mode constraints
-- max upload size (`MAX_UPLOAD_KB`)
-- UTF-8 upload content
-- extension-language contract in upload mode
-- optional language auto-detection in paste mode
-
-### 3) Context Building
-
-`InputProcessingService` builds `UnifiedContext` from:
-
-- parsed function metadata
-- intent classification
-- aggregated warnings
-
-### 4) LLM-Orchestrated Test Generation
-
-`TestGenerationChain` performs:
-
-1. behavior-first analysis
-2. test generation
-3. syntax validation and correction retries
-4. self-evaluation scoring
-
-### 5) Persistence and Artifacts
-
-The orchestrator stores all intermediate and final outputs in `generation_jobs` and writes local artifact files.
-
-### 6) Retrieval and Rerun
-
-- `GET /jobs` returns session-scoped paginated history
-- `GET /jobs/{job_id}` returns full details plus latest run stats
-- `GET /jobs/{job_id}/status` returns lightweight status polling view
-- `POST /jobs/{job_id}/rerun` replays generation from stored code snapshot
-- `POST /jobs/{job_id}/feedback` upserts one session-scoped feedback record (thumbs up/down + optional notes)
-- `GET /jobs/{job_id}/feedback` returns the current session-scoped feedback record (or null when not yet reviewed)
-
 ## API Reference
 
 ### Generation Endpoints
@@ -259,7 +259,7 @@ cp .env.example .env
 
 ## Configuration
 
-### Backend Environment Variables (high-impact)
+### Backend Environment Variables 
 
 ```bash
 # Core
@@ -268,7 +268,7 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres
 ALLOWED_ORIGINS=http://localhost:5173
 
 # LLM
-LLM_ENABLED=false
+LLM_ENABLED=
 LLM_API_KEY=
 CEREBRAS_API_KEY=
 GOOGLE_API_KEY=
@@ -318,12 +318,37 @@ Representative coverage includes:
 
 ### Docker
 
-This repository includes a root `Dockerfile` for backend runtime and frontend build stage.
+This repository uses a multi-stage `Dockerfile` that builds both backend and frontend.
 
-Note: the current `docker-compose.yml` references `Dockerfile.backend` and `Dockerfile.frontend`. If those files are not present, either:
+```bash
+docker build -t ai-test-gen .
+docker run -p 8000:8000 -p 5173:5173 ai-test-gen
+```
 
-1. add those Dockerfiles, or
-2. update compose to use the existing root `Dockerfile` strategy.
+Or use the provided `docker-compose.yml`:
+
+```bash
+docker-compose up --build
+```
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. **Fork** the repository
+2. **Create a feature branch**: `git checkout -b feature/your-feature`
+3. **Make your changes** and add tests if applicable
+4. **Run tests**: `pytest -q`
+5. **Commit** with a clear message: `git commit -m "Add feature X"`
+6. **Push** to your fork: `git push origin feature/your-feature`
+7. **Open a Pull Request**
+
+### Development Workflow
+
+- Backend tests are in `tests/`
+- Run `pytest -q` before submitting PRs
+- Ensure environment variables are documented in `.env.example`
+- Follow the existing code structure in `backend/` and `frontend/`
 
 ## Troubleshooting
 
