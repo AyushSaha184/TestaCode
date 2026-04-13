@@ -11,76 +11,104 @@ load_dotenv()
 
 
 class Settings(BaseModel):
-	model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True)
 
-	app_name: str = Field(default=os.getenv("APP_NAME", "AI Test Generation Backend"))
-	app_env: str = Field(default=os.getenv("APP_ENV", "development"))
-	log_level: str = Field(default=os.getenv("LOG_LEVEL", "INFO"))
-	log_file: str = Field(default=os.getenv("LOG_FILE", "logs/backend.log"))
-	log_to_file: bool = Field(default=os.getenv("LOG_TO_FILE", "true").lower() == "true")
-	allowed_origins: List[str] = Field(
-		default_factory=lambda: [
-			origin.strip()
-			for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
-			if origin.strip()
-		]
-	)
-	database_url: str = Field(
-		default=os.getenv("DATABASE_URL")
-		or os.getenv("RENDER_POSTGRES_URL")
-		or os.getenv("DATABASE_URL_LOCAL", "")
-	)
-	render_external_url: str = Field(default=os.getenv("RENDER_EXTERNAL_URL", ""))
-	vercel_frontend_url: str = Field(default=os.getenv("VERCEL_FRONTEND_URL", ""))
+    app_name: str = Field(default=os.getenv("APP_NAME", "AI Test Generation Backend"))
+    app_env: str = Field(default=os.getenv("APP_ENV", "development"))
+    log_level: str = Field(default=os.getenv("LOG_LEVEL", "INFO"))
+    log_file: str = Field(default=os.getenv("LOG_FILE", "logs/backend.log"))
+    log_to_file: bool = Field(
+        default=os.getenv("LOG_TO_FILE", "true").lower() == "true"
+    )
+    allowed_origins: List[str] = Field(
+        default_factory=lambda: [
+            origin.strip()
+            for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(
+                ","
+            )
+            if origin.strip()
+        ]
+    )
+    database_url: str = Field(
+        default=os.getenv("DATABASE_URL")
+        or os.getenv("RENDER_POSTGRES_URL")
+        or os.getenv("DATABASE_URL_LOCAL", "")
+    )
+    render_external_url: str = Field(default=os.getenv("RENDER_EXTERNAL_URL", ""))
+    vercel_frontend_url: str = Field(default=os.getenv("VERCEL_FRONTEND_URL", ""))
 
-	max_upload_kb: int = Field(default=int(os.getenv("MAX_UPLOAD_KB", "50")))
-	request_timeout_seconds: int = Field(default=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "40")))
+    max_upload_kb: int = Field(default=int(os.getenv("MAX_UPLOAD_KB", "50")))
+    request_timeout_seconds: int = Field(
+        default=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "40"))
+    )
 
-	parser_cache_ttl_seconds: int = Field(default=int(os.getenv("PARSER_CACHE_TTL_SECONDS", "600")))
-	intent_cache_ttl_seconds: int = Field(default=int(os.getenv("INTENT_CACHE_TTL_SECONDS", "600")))
-	idempotency_ttl_seconds: int = Field(default=int(os.getenv("IDEMPOTENCY_TTL_SECONDS", "3600")))
+    parser_cache_ttl_seconds: int = Field(
+        default=int(os.getenv("PARSER_CACHE_TTL_SECONDS", "600"))
+    )
+    intent_cache_ttl_seconds: int = Field(
+        default=int(os.getenv("INTENT_CACHE_TTL_SECONDS", "600"))
+    )
+    idempotency_ttl_seconds: int = Field(
+        default=int(os.getenv("IDEMPOTENCY_TTL_SECONDS", "3600"))
+    )
 
-	llm_enabled: bool = Field(default=os.getenv("LLM_ENABLED", "false").lower() == "true")
-	llm_api_key: str = Field(default=os.getenv("LLM_API_KEY", ""))
-	cerebras_api_key: str = Field(default=os.getenv("CEREBRAS_API_KEY", ""))
-	openrouter_api_key: str = Field(default=os.getenv("OPENROUTER_API_KEY", ""))
-	google_api_key: str = Field(default=os.getenv("GOOGLE_API_KEY", ""))
-	llm_base_url: str = Field(default=os.getenv("LLM_BASE_URL", ""))
-	llm_fast_model: str = Field(default=os.getenv("LLM_FAST_MODEL", "gpt-4o-mini"))
-	llm_fast_fallback_model: str = Field(default=os.getenv("LLM_FAST_FALLBACK_MODEL", "gemini-2.5-flash"))
-	llm_strong_model: str = Field(default=os.getenv("LLM_STRONG_MODEL", "qwen-3-235b-a22b-instruct-2507"))
-	llm_timeout_seconds: int = Field(default=int(os.getenv("LLM_TIMEOUT_SECONDS", "25")))
-	llm_max_retries: int = Field(default=int(os.getenv("LLM_MAX_RETRIES", "3")))
-	llm_enable_self_eval: bool = Field(default=os.getenv("LLM_ENABLE_SELF_EVAL", "false").lower() == "true")
-	llm_gen_timeout_seconds: int = Field(default=int(os.getenv("LLM_GEN_TIMEOUT_SECONDS", "20")))
-	llm_gen_max_retries: int = Field(default=int(os.getenv("LLM_GEN_MAX_RETRIES", "1")))
+    llm_enabled: bool = Field(
+        default=os.getenv("LLM_ENABLED", "false").lower() == "true"
+    )
+    llm_api_key: str = Field(default=os.getenv("LLM_API_KEY", ""))
+    cerebras_api_key: str = Field(default=os.getenv("CEREBRAS_API_KEY", ""))
+    openrouter_api_key: str = Field(default=os.getenv("OPENROUTER_API_KEY", ""))
+    google_api_key: str = Field(default=os.getenv("GOOGLE_API_KEY", ""))
+    llm_base_url: str = Field(default=os.getenv("LLM_BASE_URL", ""))
+    llm_fast_model: str = Field(default=os.getenv("LLM_FAST_MODEL", "gpt-4o-mini"))
+    llm_fast_fallback_model: str = Field(
+        default=os.getenv("LLM_FAST_FALLBACK_MODEL", "gemini-2.5-flash")
+    )
+    llm_strong_model: str = Field(
+        default=os.getenv("LLM_STRONG_MODEL", "qwen-3-235b-a22b-instruct-2507")
+    )
+    llm_timeout_seconds: int = Field(
+        default=int(os.getenv("LLM_TIMEOUT_SECONDS", "25"))
+    )
+    llm_max_retries: int = Field(default=int(os.getenv("LLM_MAX_RETRIES", "3")))
+    llm_enable_self_eval: bool = Field(
+        default=os.getenv("LLM_ENABLE_SELF_EVAL", "false").lower() == "true"
+    )
+    llm_gen_timeout_seconds: int = Field(
+        default=int(os.getenv("LLM_GEN_TIMEOUT_SECONDS", "20"))
+    )
+    llm_gen_max_retries: int = Field(default=int(os.getenv("LLM_GEN_MAX_RETRIES", "1")))
+    max_code_size_kb: int = Field(default=int(os.getenv("MAX_CODE_SIZE_KB", "512")))
 
-	def validate_production_configuration(self) -> None:
-		if self.app_env.lower() != "production":
-			return
-		if not self.database_url:
-			raise ValueError("DATABASE_URL is required in production")
-		if self.vercel_frontend_url and self.vercel_frontend_url not in self.cors_origins():
-			raise ValueError("VERCEL_FRONTEND_URL must be included in CORS origins")
+    def validate_production_configuration(self) -> None:
+        if self.app_env.lower() != "production":
+            return
+        if not self.database_url:
+            raise ValueError("DATABASE_URL is required in production")
+        if (
+            self.vercel_frontend_url
+            and self.vercel_frontend_url not in self.cors_origins()
+        ):
+            raise ValueError("VERCEL_FRONTEND_URL must be included in CORS origins")
 
-	def cors_origins(self) -> list[str]:
-		origins = set(self.allowed_origins)
-		if self.vercel_frontend_url:
-			origins.add(self.vercel_frontend_url.strip())
-		return sorted(origin for origin in origins if origin)
+    def cors_origins(self) -> list[str]:
+        origins = set(self.allowed_origins)
+        if self.vercel_frontend_url:
+            origins.add(self.vercel_frontend_url.strip())
+        return sorted(origin for origin in origins if origin)
 
 
 @lru_cache(maxsize=1)
 def _get_settings_cached() -> Settings:
-	return Settings()
+    return Settings()
 
 
 def clear_settings_cache() -> None:
-	_get_settings_cached.cache_clear()
+    _get_settings_cached.cache_clear()
 
 
 def get_settings(*, refresh: bool = False) -> Settings:
-	if refresh:
-		load_dotenv(override=True)
-		clear_settings_cache()
-	return _get_settings_cached()
+    if refresh:
+        load_dotenv(override=True)
+        clear_settings_cache()
+    return _get_settings_cached()

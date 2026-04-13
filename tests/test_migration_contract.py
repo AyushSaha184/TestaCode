@@ -14,7 +14,6 @@ def test_generation_jobs_contract_columns_present_in_migrations() -> None:
             "004_storage_and_contract_alignment.sql",
             "005_source_upload_artifacts.sql",
             "006_hitl_feedback_and_parser_cache_ready.sql",
-            "007_remove_cicd_and_supabase.sql",
         ]
     ).lower()
 
@@ -44,7 +43,11 @@ def test_generation_jobs_contract_columns_present_in_migrations() -> None:
 
 
 def test_required_indexes_present_in_migrations() -> None:
-    sql = Path("database/migrations/004_storage_and_contract_alignment.sql").read_text(encoding="utf-8").lower()
+    sql = (
+        Path("database/migrations/004_storage_and_contract_alignment.sql")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
 
     assert "idx_generation_jobs_session_created_at_desc" in sql
     assert "idx_generation_jobs_status" in sql

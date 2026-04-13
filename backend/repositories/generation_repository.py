@@ -25,14 +25,33 @@ class GenerationRepository:
     def __init__(self, db: DatabaseClient) -> None:
         self.db = db
 
-    def create_job(self, payload: GenerationRequest, status: JobStatus = JobStatus.queued) -> UUID:
+    def create_job(
+        self,
+        payload: GenerationRequest,
+        status: JobStatus = JobStatus.queued,
+        idempotency_key: str | None = None,
+    ) -> UUID:
+        if idempotency_key:
+            existing = self.db.fetchone(
+                """
+                SELECT id FROM generation_jobs
+                WHERE session_id = %s
+                  AND idempotency_key = %s
+                  AND status IN ('completed', 'processing', 'queued')
+                LIMIT 1
+                """,
+                (payload.session_id, idempotency_key),
+            )
+            if existing:
+                return existing["id"]
+
         job_id = uuid4()
         self.db.execute(
             """
             INSERT INTO generation_jobs (
                 id, session_id, input_mode, original_filename, detected_language,
-                user_prompt, classified_intent, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+                user_prompt, classified_intent, status, idempotency_key
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
             """,
             (
                 job_id,
@@ -43,6 +62,7 @@ class GenerationRepository:
                 payload.user_prompt,
                 "{}",
                 status.value,
+                idempotency_key,
             ),
         )
         return job_id
@@ -131,10 +151,16 @@ class GenerationRepository:
         )
 
     def get_job_record(self, job_id: UUID, session_id: str) -> dict[str, Any] | None:
-        return self.db.fetchone("SELECT * FROM generation_jobs WHERE id = %s AND session_id = %s", (job_id, session_id))
+        return self.db.fetchone(
+            "SELECT * FROM generation_jobs WHERE id = %s AND session_id = %s",
+            (job_id, session_id),
+        )
 
     def get_job(self, job_id: UUID, session_id: str) -> JobDetail | None:
-        row = self.db.fetchone("SELECT * FROM generation_jobs WHERE id = %s AND session_id = %s", (job_id, session_id))
+        row = self.db.fetchone(
+            "SELECT * FROM generation_jobs WHERE id = %s AND session_id = %s",
+            (job_id, session_id),
+        )
         if not row:
             return None
 
@@ -210,7 +236,9 @@ class GenerationRepository:
             raise RuntimeError("Database health check failed")
         return row["ts"]
 
-    def upsert_job_feedback(self, job_id: UUID, session_id: str, payload: JobFeedbackRequest) -> JobFeedbackResponse:
+    def upsert_job_feedback(
+        self, job_id: UUID, session_id: str, payload: JobFeedbackRequest
+    ) -> JobFeedbackResponse:
         snapshot = self.db.fetchone(
             """
             SELECT detected_language, user_prompt, generated_test_code, quality_score, framework_used, classified_intent
@@ -276,7 +304,9 @@ class GenerationRepository:
             raise RuntimeError("Failed to persist job feedback")
         return _row_to_job_feedback(row)
 
-    def get_job_feedback(self, job_id: UUID, session_id: str) -> JobFeedbackResponse | None:
+    def get_job_feedback(
+        self, job_id: UUID, session_id: str
+    ) -> JobFeedbackResponse | None:
         row = self.db.fetchone(
             "SELECT * FROM generation_job_feedback WHERE job_id = %s AND session_id = %s",
             (job_id, session_id),
